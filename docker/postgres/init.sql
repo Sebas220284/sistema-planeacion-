@@ -117,7 +117,7 @@ CREATE TABLE reports (
     FOREIGN KEY (generated_by) REFERENCES users(id)
 );
 
--- INDEXES (para rendimiento)
+-- (para rendimiento)
 CREATE INDEX idx_documents_dependency
 ON documents(dependency_id);
 
