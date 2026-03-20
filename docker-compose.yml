@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   postgres:
@@ -8,7 +6,7 @@ services:
 
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_PASSWORD: milanesa2002
       POSTGRES_DB: planeacion_proyectos
 
     ports:
