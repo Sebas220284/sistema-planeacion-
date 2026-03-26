@@ -23,7 +23,6 @@ return result.rows[0]
 
 }
 
-
 async findByEmail(email) {
 
 const result = await pool.query(
@@ -35,7 +34,6 @@ return result.rows[0]
 
 }
 
-
 async findById(id) {
 
 const result = await pool.query(
@@ -44,13 +42,21 @@ SELECT
 u.id,
 u.name,
 u.email,
+r.name as role,
+
 d.id as dependency_id,
 d.name as dependencia,
 d.titular,
 d.enlace
+
 FROM users u
+
+LEFT JOIN roles r
+ON u.role_id = r.id
+
 LEFT JOIN dependencies d
 ON u.dependency_id = d.id
+
 WHERE u.id = $1
 `,
 [id]
@@ -61,7 +67,6 @@ return result.rows[0]
 }
 
 
- 
 async findUserWithStrategies(userId){
 
 const result = await pool.query(
@@ -70,6 +75,7 @@ SELECT
 u.id,
 u.name,
 u.email,
+r.name as role,
 
 d.id as dependency_id,
 d.name as dependencia,
@@ -96,6 +102,9 @@ p.responsable,
 p.plazo
 
 FROM users u
+
+LEFT JOIN roles r
+ON u.role_id = r.id
 
 LEFT JOIN dependencies d
 ON u.dependency_id = d.id

@@ -13,13 +13,18 @@ throw new Error("Usuario no encontrado")
 }
 
 const user = {
+
 id: rows[0].id,
 name: rows[0].name,
 email: rows[0].email,
+rol: rows[0].role,  
+
 dependencia: rows[0].dependencia,
 titular: rows[0].titular,
 enlace: rows[0].enlace,
+
 estrategias: []
+
 }
 
 rows.forEach(r => {

@@ -6,12 +6,19 @@ console.log("ENV DB:", {
   database: process.env.DB_NAME
 })
 const express = require("express")
+const http= require("http")
+const {Server}=require("socket.io")
 const cors = require("cors")
 
 const db = require("./database/postgres")
 const authRoutes = require("./interfaces/http/routes/authRoutes")
-
+const planeacionRoutes = require("./interfaces/http/routes/planeacionRoutes")
 const app = express()
+const server= http.createServer(app)
+
+const io= new Server(server,{
+  cors:{origin:"*"}
+})
 
 app.use(cors({
   origin: "*",
@@ -20,6 +27,10 @@ app.use(cors({
 
 app.use(express.json())
 
+
+io.on("connection",(socket)=>{
+  console.log("Usuario Conectado:)",socket.id)
+})
 // verificar conexión a la base de datos
 async function checkDatabase() {
   try {
@@ -65,7 +76,7 @@ app.get("/", (req, res) => {
 
 // rutas de autenticación
 app.use("/api/auth", authRoutes)
-
+app.use("/api/planeacion", planeacionRoutes)
 
 // ruta no encontrada
 app.use((req, res) => {
@@ -89,11 +100,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
 
-  console.log("🚀 ===============================")
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`)
-  console.log(`🌎 http://localhost:${PORT}`)
-  console.log("🚀 ===============================")
+
+  console.log(` Servidor corriendo en puerto ${PORT}`)
+  console.log(`http://localhost:${PORT}`)
+  
 
 })
