@@ -12,12 +12,15 @@ const cors = require("cors")
 
 const db = require("./database/postgres")
 const authRoutes = require("./interfaces/http/routes/authRoutes")
+const trimestresRoutes = require("./interfaces/http/routes/trimestreRoutes")
+const planeacionReviewRoutes = require("./interfaces/http/routes/planeacionReview.routes")
 const planeacionRoutes = require("./interfaces/http/routes/planeacionRoutes")
 const app = express()
 const server= http.createServer(app)
 
 const io= new Server(server,{
-  cors:{origin:"*"}
+  cors:{
+    origin:"*"}
 })
 
 app.use(cors({
@@ -89,7 +92,7 @@ app.use((req, res) => {
 // manejo de errores
 app.use((err, req, res, next) => {
 
-  console.error("🔥 Error:", err)
+  console.error(" Error:", err)
 
   res.status(500).json({
     error: "Error interno del servidor"

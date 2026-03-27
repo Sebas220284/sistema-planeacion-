@@ -1,6 +1,6 @@
-const PostgresPlanningRepository = require("../../../infrastructure/repositories/PostgresPlanningRepository")
+const PostgresPlanningRepository = require("../../infrastructure/repositories/PostgresPlanningRepository")
 
-const SaveTrimestre = require("../../../application/use-cases/SaveTrimestre")
+const SaveTrimestre = require("../../application/use-cases/SaveTrimestre")
 
 const repository = new PostgresPlanningRepository()
 

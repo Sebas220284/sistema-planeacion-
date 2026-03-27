@@ -1,4 +1,4 @@
-const pool = require("../db")
+const pool = require("../../../database/postgres")
 
 exports.revisarTrimestre = async(req,res)=>{
 

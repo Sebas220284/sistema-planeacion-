@@ -64,7 +64,7 @@ CREATE TABLE documents (
     status VARCHAR(50) DEFAULT 'draft',
     submitted_at TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
+-- da661f92-22e1-44fb-8ac2-0d3b2056c281
     FOREIGN KEY (template_id) REFERENCES document_templates(id),
     FOREIGN KEY (dependency_id) REFERENCES dependencies(id),
     FOREIGN KEY (created_by) REFERENCES users(id)
