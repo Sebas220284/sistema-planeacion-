@@ -19,7 +19,7 @@ class LoginUser {
     const validPassword = await bcrypt.compare(password, user.password_hash)
 
     if(!validPassword){
-      throw new Error("Password incorrecto")
+      throw new Error("Contraseña incorrecta")
     }
 
     const token = jwt.sign(

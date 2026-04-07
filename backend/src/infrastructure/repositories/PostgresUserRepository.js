@@ -69,59 +69,59 @@ return result.rows[0]
 
 async findUserWithStrategies(userId){
 
-const result = await pool.query(
-`
-SELECT 
-u.id,
-u.name,
-u.email,
-r.name as role,
+  const result = await pool.query(
+    `
+    SELECT 
+    u.id,
+    u.name,
+    u.email,
+    r.name as role,
 
-d.id as dependency_id,
-d.name as dependencia,
-d.titular,
-d.enlace,
+    d.id as dependency_id,
+    d.name as dependencia,
+    d.titular,
+    d.enlace,
 
-s.id as strategy_id,
-s.name as strategy_name,
-s.description,
+    s.id as strategy_id,
+    s.name as strategy_name,
+    s.description,
 
-p.pmd_eje,
-p.pmd_tema,
-p.pmd_politica_publica,
-p.pmd_objetivo,
-p.pmd_estrategia,
-p.linea_base,
-p.total,
-p.ejercicio,
-p.columna1,
-p.lineas_accion,
-p.nomenclatura,
-p.nombre2,
-p.responsable,
-p.plazo
+    p.id as linea_id,        -- ✅ agrega esta línea
+    p.pmd_eje,
+    p.pmd_tema,
+    p.pmd_politica_publica,
+    p.pmd_objetivo,
+    p.pmd_estrategia,
+    p.linea_base,
+    p.total,
+    p.ejercicio,
+    p.columna1,
+    p.lineas_accion,
+    p.nomenclatura,
+    p.nombre2,
+    p.responsable,
+    p.plazo
 
-FROM users u
+    FROM users u
 
-LEFT JOIN roles r
-ON u.role_id = r.id
+    LEFT JOIN roles r
+    ON u.role_id = r.id
 
-LEFT JOIN dependencies d
-ON u.dependency_id = d.id
+    LEFT JOIN dependencies d
+    ON u.dependency_id = d.id
 
-LEFT JOIN strategies s
-ON d.id = s.dependency_id
+    LEFT JOIN strategies s
+    ON d.id = s.dependency_id
 
-LEFT JOIN planning_templates p
-ON p.strategy_id = s.id
+    LEFT JOIN planning_templates p
+    ON p.strategy_id = s.id
 
-WHERE u.id = $1
-`,
-[userId]
-)
+    WHERE u.id = $1
+    `,
+    [userId]
+  )
 
-return result.rows
-
+  return result.rows
 }
 
 }

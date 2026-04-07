@@ -3,6 +3,7 @@ const router = express.Router()
 
 const controller = require("../controllers/planeacionController")
 
-router.get("/dashboard",controller.dashboard)
+router.get("/dashboard", controller.dashboard)
 
 module.exports = router
+

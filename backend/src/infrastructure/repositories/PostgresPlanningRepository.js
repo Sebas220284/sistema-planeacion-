@@ -30,7 +30,15 @@ p.nombre2,
 p.responsable,
 p.plazo,
 p.estado,
-p.comentario_planeacion
+p.comentario_planeacion,
+
+t.id as trimestre_id,
+t.anio,
+t.trimestre,
+t.tipo,
+t.valor,
+t.estado_revision,
+t.comentario_revision
 
 FROM dependencies d
 
@@ -40,38 +48,16 @@ ON s.dependency_id = d.id
 LEFT JOIN planning_templates p
 ON p.strategy_id = s.id
 
-ORDER BY d.name,s.name
+LEFT JOIN planning_trimestres t
+ON t.planning_id = p.id
+
+ORDER BY d.name,s.name,p.id
+
 `)
 
 return result.rows
 
 }
-
-async aprobarLinea(id,usuario){
-
-await pool.query(`
-UPDATE planning_templates
-SET estado='aprobado',
-aprobado_por=$2,
-fecha_revision=NOW()
-WHERE id=$1
-`,[id,usuario])
-
-}
-
-async rechazarLinea(id,comentario,usuario){
-
-await pool.query(`
-UPDATE planning_templates
-SET estado='rechazado',
-comentario_planeacion=$2,
-aprobado_por=$3,
-fecha_revision=NOW()
-WHERE id=$1
-`,[id,comentario,usuario])
-
-}
-
 
 async saveTrimestre(data){
 
@@ -84,7 +70,7 @@ valor,
 comentario
 } = data
 
-const result = await this.pool.query(
+const result = await pool.query(
 
 `
 INSERT INTO planning_trimestres
@@ -112,7 +98,7 @@ async reviewTrimestre(data){
 
 const {id,estado,comentario,user_id} = data
 
-const result = await this.pool.query(
+const result = await pool.query(
 
 `
 UPDATE planning_trimestres
@@ -134,6 +120,14 @@ RETURNING *
 return result.rows[0]
 
 }
+async getTrimestres(planning_id) {
+  const result = await pool.query(
+    `SELECT * FROM planning_trimestres WHERE planning_id = $1`,
+    [planning_id]
+  )
+  return result.rows
+}
+ 
 
 }
 

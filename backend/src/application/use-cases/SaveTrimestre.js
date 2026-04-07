@@ -1,29 +1,11 @@
-const PostgresPlanningRepository = require("../../infrastructure/repositories/PostgresPlanningRepository")
+class SaveTrimestre {
+  constructor(repository) {
+    this.repository = repository
+  }
 
-const SaveTrimestre = require("../../application/use-cases/SaveTrimestre")
-
-const repository = new PostgresPlanningRepository()
-
-exports.save = async (req,res)=>{
-
-try{
-
-const useCase = new SaveTrimestre(repository)
-
-const data = await useCase.execute(req.body)
-
-req.app.get("io").emit("trimestre_actualizado",data)
-
-res.json(data)
-
-}catch(error){
-
-console.error(error)
-
-res.status(500).json({
-error:"Error guardando trimestre"
-})
-
+  async execute(data) {
+    return await this.repository.saveTrimestre(data)
+  }
 }
 
-}
+module.exports = SaveTrimestre

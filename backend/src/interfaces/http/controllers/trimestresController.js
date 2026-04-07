@@ -3,26 +3,32 @@ const SaveTrimestre = require("../../../application/use-cases/SaveTrimestre")
 
 const repository = new PostgresPlanningRepository()
 
-exports.save = async (req,res)=>{
+// trimestresController.js
+exports.save = async (req, res) => {
+  try {
+    const useCase = new SaveTrimestre(repository)
+    const data = await useCase.execute(req.body)
 
-try{
+    // Notifica a planeación que una dependencia envió planeación
+    req.app.get("io").emit("trimestre_actualizado", data)
+    req.app.get("io").emit("dependencia_envio_planeacion", {
+      planning_id: data.planning_id,
+      mensaje: `La dependencia actualizó su planeación`,
+      data
+    })
 
-const useCase = new SaveTrimestre(repository)
-
-const data = await useCase.execute(req.body)
-
-req.app.get("io").emit("trimestre_actualizado",data)
-
-res.json(data)
-
-}catch(error){
-
-console.error(error)
-
-res.status(500).json({
-error:"Error guardando trimestre"
-})
-
+    res.json(data)
+  } catch(error) {
+    console.error(error)
+    res.status(500).json({ error: "Error guardando trimestre" })
+  }
 }
-
+exports.getByLinea = async (req, res) => {
+  try {
+    const data = await repository.getTrimestres(req.params.planning_id)
+    res.json(data)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: "Error obteniendo trimestres" })
+  }
 }
