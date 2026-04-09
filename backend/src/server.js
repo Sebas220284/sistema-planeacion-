@@ -24,18 +24,23 @@ const io = new Server(server,{
   }
 })
 
-
-app.set("io",io)
-
-
+app.set("io", io)
 io.on("connection",(socket)=>{
-
   console.log("Usuario conectado:",socket.id)
+
+  socket.on("join_room",(dependency_id)=>{
+    socket.join(dependency_id)
+    console.log(`Socket ${socket.id} se unió al room ${dependency_id}`)
+  })
+
+  socket.on("join_planeacion",()=>{
+    socket.join("planeacion")
+    console.log(`Planeación conectada: ${socket.id}`)
+  })
 
   socket.on("disconnect",()=>{
     console.log("Usuario desconectado:",socket.id)
   })
-
 })
 
 
@@ -91,7 +96,6 @@ app.use("/api/planeacion",planeacionRoutes)
 app.use("/api/review",planeacionReviewRoutes)
 //app.use("/api/lineas")
 
-/* 404 */
 
 app.use((req,res)=>{
 

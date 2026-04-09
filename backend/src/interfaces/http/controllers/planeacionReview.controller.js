@@ -9,8 +9,10 @@ exports.review = async (req, res) => {
     const useCase = new ReviewTrimestre(repository)
     const data = await useCase.execute({ id: req.params.id, ...req.body })
 
-    req.app.get("io").emit("revision-trimestre", data)
-    req.app.get("io").emit("planeacion_reviso", {
+    const io = req.app.get("io")
+
+    // Emite solo al room de esa dependencia
+    io.to(req.body.dependency_id).emit("planeacion_reviso", {
       planning_id: data.planning_id,
       estado: data.estado_revision,
       comentario: data.comentario_revision,
@@ -19,6 +21,9 @@ exports.review = async (req, res) => {
       tipo: data.tipo,
       mensaje: `Tu trimestre fue ${data.estado_revision}`
     })
+
+    // Notifica a planeación también
+    io.to("planeacion").emit("revision-trimestre", data)
 
     res.json(data)
   } catch(error) {

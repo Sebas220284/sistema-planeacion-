@@ -60,40 +60,28 @@ return result.rows
 }
 
 async saveTrimestre(data){
+  const { planning_id, anio, trimestre, tipo, valor, comentario } = data
 
-const {
-planning_id,
-anio,
-trimestre,
-tipo,
-valor,
-comentario
-} = data
+  const tieneValor = Number(valor) > 0
+  const tieneComentario = comentario && comentario.trim() !== ""
 
-const result = await pool.query(
+  if(!tieneValor && !tieneComentario) return null
 
-`
-INSERT INTO planning_trimestres
-(planning_id,anio,trimestre,tipo,valor,comentario)
+  const result = await pool.query(`
+    INSERT INTO planning_trimestres
+    (planning_id, anio, trimestre, tipo, valor, comentario, estado_envio, fecha_envio)
+    VALUES($1,$2,$3,$4,$5,$6,'enviado'::varchar, NOW())
+    ON CONFLICT(planning_id, anio, trimestre, tipo)
+    DO UPDATE SET
+      valor = EXCLUDED.valor,
+      comentario = EXCLUDED.comentario,
+      estado_envio = 'enviado'::varchar,
+      fecha_envio = NOW()
+    RETURNING *
+  `, [planning_id, anio, trimestre, tipo, valor, comentario])
 
-VALUES($1,$2,$3,$4,$5,$6)
-
-ON CONFLICT(planning_id,anio,trimestre,tipo)
-
-DO UPDATE SET
-valor=EXCLUDED.valor,
-comentario=EXCLUDED.comentario
-
-RETURNING *
-`,
-[planning_id,anio,trimestre,tipo,valor,comentario]
-
-)
-
-return result.rows[0]
-
+  return result.rows[0]
 }
-
 async reviewTrimestre(data){
 
 const {id,estado,comentario,user_id} = data
