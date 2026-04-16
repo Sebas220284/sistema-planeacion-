@@ -12,7 +12,7 @@ const authRoutes = require("./interfaces/http/routes/authRoutes")
 const trimestresRoutes = require("./interfaces/http/routes/trimestreRoutes")
 const planeacionRoutes = require("./interfaces/http/routes/planeacionRoutes")
 const planeacionReviewRoutes = require("./interfaces/http/routes/planeacionReview.routes")
-
+const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
 const app = express()
 const server = http.createServer(app)
 
@@ -95,6 +95,7 @@ app.use("/api/planeacion",planeacionRoutes)
 
 app.use("/api/review",planeacionReviewRoutes)
 //app.use("/api/lineas")
+app.use("/api/lineas", lineasRoutes)
 
 
 app.use((req,res)=>{

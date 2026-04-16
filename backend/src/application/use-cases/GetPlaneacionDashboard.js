@@ -17,6 +17,8 @@ if(!dependencias[r.dependencia_id]){
 dependencias[r.dependencia_id]={
 id:r.dependencia_id,
 name:r.dependencia,
+titular:r.titular,
+enlace:r.enlace,
 estrategias:{}
 }
 

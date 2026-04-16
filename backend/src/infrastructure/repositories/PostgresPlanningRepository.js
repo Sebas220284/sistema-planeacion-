@@ -10,7 +10,8 @@ SELECT
 
 d.id as dependencia_id,
 d.name as dependencia,
-
+d.titular,        
+d.enlace,        
 s.id as estrategia_id,
 s.name as estrategia,
 
