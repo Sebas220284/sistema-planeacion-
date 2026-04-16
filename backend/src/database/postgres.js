@@ -1,35 +1,34 @@
-const { Pool } = require("pg")
+const { Pool } = require("pg");
+
+// Log para verificar en Railway qué está leyendo (No imprimas el Password por seguridad)
+console.log("Intentando conectar a DB en:", process.env.DB_HOST);
 
 const pool = new Pool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: process.env.DB_PORT,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT || 5432,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  ssl: process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1' 
+  // ESTO ES VITAL PARA RAILWAY
+  ssl: process.env.DB_HOST && !process.env.DB_HOST.includes('localhost') 
     ? { rejectUnauthorized: false } 
     : false
-})
+});
 
 async function testDB() {
   try {
-    const db = await pool.query("SELECT current_database()")
-    console.log("✅ CONECTADO A:", db.rows[0].current_database)
+    // Si DB_HOST es undefined, lanzamos error antes de intentar conectar
+    if (!process.env.DB_HOST) {
+      throw new Error("La variable DB_HOST no está definida en el entorno.");
+    }
 
-    const res = await pool.query(`
-      SELECT 
-      current_database(),
-      current_user,
-      inet_server_addr(),
-      inet_server_port()
-    `)
-    console.table(res.rows) 
-
+    const res = await pool.query("SELECT NOW()");
+    console.log("✅ Conexión exitosa a Postgres:", res.rows[0]);
   } catch (err) {
-    console.error("❌ DB ERROR:", err.message)
+    console.error("❌ ERROR CRÍTICO DE CONEXIÓN:", err.message);
   }
 }
 
-testDB()
+testDB();
 
-module.exports = pool
+module.exports = pool;
