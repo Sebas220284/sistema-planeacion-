@@ -5,34 +5,30 @@ const pool = new Pool({
   port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  // CONFIGURACIÓN CLAVE PARA RAILWAY:
+  ssl: process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1' 
+    ? { rejectUnauthorized: false } 
+    : false
 })
 
 async function testDB() {
   try {
-
     const db = await pool.query("SELECT current_database()")
-    console.log("DATABASE:", db.rows)
+    console.log("✅ CONECTADO A:", db.rows[0].current_database)
 
-    const tables = await pool.query(`
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_name='users'
+    const res = await pool.query(`
+      SELECT 
+      current_database(),
+      current_user,
+      inet_server_addr(),
+      inet_server_port()
     `)
-
-    console.log("TABLES:", tables.rows)
+    console.table(res.rows) // Usar table se ve más limpio en logs
 
   } catch (err) {
-    console.error("DB ERROR:", err)
+    console.error("❌ DB ERROR:", err.message)
   }
-  const res = await pool.query(`
-SELECT 
-current_database(),
-current_user,
-inet_server_addr(),
-inet_server_port()
-`)
-console.log(res.rows)
 }
 
 testDB()
