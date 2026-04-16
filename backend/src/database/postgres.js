@@ -1,35 +1,20 @@
-const { Pool } = require("pg")
+const { Pool } = require("pg");
+
+// Agregamos este log para ver qué está pasando realmente en la consola de Railway
+console.log("--- INTENTO DE CONEXIÓN DB ---");
+console.log("HOST:", process.env.DB_HOST);
+console.log("USER:", process.env.DB_USER);
 
 const pool = new Pool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: process.env.DB_PORT,
+  host: process.env.DB_HOST, // Si esto llega undefined, usará el default del driver que es 127.0.0.1
+  port: process.env.DB_PORT || 5432,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  ssl: process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== '127.0.0.1' 
+  // CRÍTICO PARA RAILWAY:
+  ssl: process.env.DB_HOST && !process.env.DB_HOST.includes('localhost') 
     ? { rejectUnauthorized: false } 
     : false
-})
+});
 
-async function testDB() {
-  try {
-    const db = await pool.query("SELECT current_database()")
-    console.log("✅ CONECTADO A:", db.rows[0].current_database)
-
-    const res = await pool.query(`
-      SELECT 
-      current_database(),
-      current_user,
-      inet_server_addr(),
-      inet_server_port()
-    `)
-    console.table(res.rows) 
-
-  } catch (err) {
-    console.error("❌ DB ERROR:", err.message)
-  }
-}
-
-testDB()
-
-module.exports = pool
+module.exports = pool;
