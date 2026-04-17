@@ -1,21 +1,40 @@
-const { Pool } = require("pg");
-
-// LOG DE DIAGNÓSTICO PROFESIONAL
-console.log("--- REVISIÓN DE VARIABLES EN PRODUCCIÓN ---");
-console.log("DB_HOST existe?:", !!process.env.DB_HOST);
-console.log("Valor de DB_HOST:", process.env.DB_HOST || "NO DEFINIDO (Usando default 127.0.0.1)");
-console.log("DB_USER existe?:", !!process.env.DB_USER);
-console.log("-------------------------------------------");
+const { Pool } = require("pg")
 
 const pool = new Pool({
   host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 5432,
+  port: process.env.DB_PORT,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  ssl: process.env.DB_HOST && !process.env.DB_HOST.includes('localhost') 
-    ? { rejectUnauthorized: false } 
-    : false
-});
+  database: process.env.DB_NAME
+})
 
-module.exports = pool;
+async function testDB() {
+  try {
+
+    const db = await pool.query("SELECT current_database()")
+    console.log("DATABASE:", db.rows)
+
+    const tables = await pool.query(`
+      SELECT table_schema, table_name
+      FROM information_schema.tables
+      WHERE table_name='users'
+    `)
+
+    console.log("TABLES:", tables.rows)
+
+  } catch (err) {
+    console.error("DB ERROR:", err)
+  }
+  const res = await pool.query(`
+SELECT 
+current_database(),
+current_user,
+inet_server_addr(),
+inet_server_port()
+`)
+console.log(res.rows)
+}
+
+testDB()
+
+module.exports = pool
