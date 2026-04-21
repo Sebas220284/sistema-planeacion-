@@ -66,7 +66,7 @@ async function checkDatabase(){
   }catch(error){
 
     console.error("Error conexión DB:",error)
-    process.exit(1)
+  //  process.exit(1)
 
   }
 
