@@ -7,12 +7,12 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  // CRÍTICO: Railway requiere SSL para conexiones externas
   ssl: {
     rejectUnauthorized: false
   }
 });
-console.log("Intentando conectar a DB en:", process.env.DB_HOST);
+
+console.log("Intentando conectar a DB en:", process.env.DB_HOST || "ERROR: VARIABLE VACÍA");
 async function testDB() {
   try {
 
