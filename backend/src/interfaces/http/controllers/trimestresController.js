@@ -8,7 +8,7 @@ exports.save = async (req, res) => {
     const useCase = new SaveTrimestre(repository)
     const data = await useCase.execute(req.body)
 
-    if(data){  // ✅ solo emite si se guardó algo
+    if(data){ 
       req.app.get("io").to("planeacion").emit("dependencia_envio_planeacion", {
         planning_id: data.planning_id,
         fecha_envio: data.fecha_envio,

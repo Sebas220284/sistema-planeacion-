@@ -13,6 +13,7 @@ const trimestresRoutes = require("./interfaces/http/routes/trimestreRoutes")
 const planeacionRoutes = require("./interfaces/http/routes/planeacionRoutes")
 const planeacionReviewRoutes = require("./interfaces/http/routes/planeacionReview.routes")
 const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
+const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
 const app = express()
 const server = http.createServer(app)
 
@@ -96,7 +97,7 @@ app.use("/api/planeacion",planeacionRoutes)
 app.use("/api/review",planeacionReviewRoutes)
 //app.use("/api/lineas")
 app.use("/api/lineas", lineasRoutes)
-
+app.use("/api/pdf", pdfRoutes)
 
 app.use((req,res)=>{
 

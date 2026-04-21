@@ -1,2 +1,4 @@
 node_modules/
 .ENV
+tarjet.js
+seedUsers.js

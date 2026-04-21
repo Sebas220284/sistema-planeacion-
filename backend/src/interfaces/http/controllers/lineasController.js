@@ -129,7 +129,6 @@ exports.rechazar = async (req, res) => {
       [id]
     )
 
-    // Luego elimina la línea
     await pool.query(
       `DELETE FROM planning_templates WHERE id = $1`,
       [id]
