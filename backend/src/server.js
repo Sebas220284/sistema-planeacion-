@@ -4,19 +4,16 @@ const express = require("express")
 const http = require("http")
 const { Server } = require("socket.io")
 const cors = require("cors")
-
 const db = require("./database/postgres")
-
-
 const authRoutes = require("./interfaces/http/routes/authRoutes")
 const trimestresRoutes = require("./interfaces/http/routes/trimestreRoutes")
 const planeacionRoutes = require("./interfaces/http/routes/planeacionRoutes")
 const planeacionReviewRoutes = require("./interfaces/http/routes/planeacionReview.routes")
 const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
 const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
+const pmdRoutes = require("./interfaces/http/routes/pmdRoutes")
 const app = express()
 const server = http.createServer(app)
-
 
 const io = new Server(server,{
   cors:{
@@ -24,7 +21,6 @@ const io = new Server(server,{
     methods:["GET","POST","PUT","DELETE"]
   }
 })
-
 app.set("io", io)
 io.on("connection",(socket)=>{
   console.log("Usuario conectado:",socket.id)
@@ -43,18 +39,12 @@ io.on("connection",(socket)=>{
     console.log("Usuario desconectado:",socket.id)
   })
 })
-
-
-
 app.use(cors({
   origin:"*",
   methods:["GET","POST","PUT","DELETE"]
 }))
 
 app.use(express.json())
-
-
-
 async function checkDatabase(){
 
   try{
@@ -71,10 +61,7 @@ async function checkDatabase(){
   }
 
 }
-
 checkDatabase()
-
-
 
 app.get("/",(req,res)=>{
 
@@ -86,18 +73,14 @@ app.get("/",(req,res)=>{
 
 })
 
-
-
 app.use("/api/auth",authRoutes)
-
 app.use("/api/trimestres",trimestresRoutes)
-
 app.use("/api/planeacion",planeacionRoutes)
-
 app.use("/api/review",planeacionReviewRoutes)
 //app.use("/api/lineas")
 app.use("/api/lineas", lineasRoutes)
 app.use("/api/pdf", pdfRoutes)
+app.use("/api/pmd", pmdRoutes)
 
 app.use((req,res)=>{
 
@@ -106,9 +89,6 @@ app.use((req,res)=>{
   })
 
 })
-
-
-
 app.use((err,req,res,next)=>{
 
   console.error("Error:",err)
@@ -118,8 +98,6 @@ app.use((err,req,res,next)=>{
   })
 
 })
-
-
 
 const PORT = process.env.PORT || 3001
 
