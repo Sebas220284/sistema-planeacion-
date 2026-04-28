@@ -67,3 +67,16 @@ exports.revisar = async (req, res) => {
     res.status(500).json({ error: "Error revisando plan" })
   }
 }
+  exports.aprobados = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM pmd_estrategias 
+      WHERE estado = 'aprobado'
+      ORDER BY eje, tema, estrategia
+    `)
+    res.json(result.rows)
+  } catch(error) {
+    console.error(error)
+    res.status(500).json({ error: "Error obteniendo estrategias" })
+  }
+}
