@@ -12,6 +12,8 @@ const planeacionReviewRoutes = require("./interfaces/http/routes/planeacionRevie
 const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
 const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
 const pmdRoutes = require("./interfaces/http/routes/pmdRoutes")
+const fichasRoutes = require("./interfaces/http/routes/fichasRoutes")
+
 const app = express()
 const server = http.createServer(app)
 
@@ -81,7 +83,7 @@ app.use("/api/review",planeacionReviewRoutes)
 app.use("/api/lineas", lineasRoutes)
 app.use("/api/pdf", pdfRoutes)
 app.use("/api/pmd", pmdRoutes)
-
+app.use("/api/fichas", fichasRoutes)
 app.use((req,res)=>{
 
   res.status(404).json({
