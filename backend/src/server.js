@@ -13,7 +13,7 @@ const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
 const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
 const pmdRoutes = require("./interfaces/http/routes/pmdRoutes")
 const fichasRoutes = require("./interfaces/http/routes/fichasRoutes")
-
+///const transporteRoutes = require("./interfaces/http/routes/transporteRoutes")
 const app = express()
 const server = http.createServer(app)
 
@@ -46,6 +46,15 @@ app.use(cors({
   methods:["GET","POST","PUT","DELETE"]
 }))
 
+
+const ioTransporte = io.of('/transporte');
+ioTransporte.on('connection', (socket) => {
+    console.log('Conectado a Transporte');
+    
+    socket.on('actualizar_ubicacion', (coords) => {
+        ioTransporte.emit('bus_moviéndose', coords);
+    });
+});
 app.use(express.json())
 async function checkDatabase(){
 
@@ -84,6 +93,7 @@ app.use("/api/lineas", lineasRoutes)
 app.use("/api/pdf", pdfRoutes)
 app.use("/api/pmd", pmdRoutes)
 app.use("/api/fichas", fichasRoutes)
+//app.use('/api/v1/transporte', transporteRoutes);
 app.use((req,res)=>{
 
   res.status(404).json({
