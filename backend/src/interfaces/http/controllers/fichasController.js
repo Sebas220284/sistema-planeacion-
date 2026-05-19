@@ -30,17 +30,29 @@ exports.crear = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO fichas_tecnicas (${cols}) VALUES (${params}) RETURNING *`, vals
     )
-    req.app.get("io").to("planeacion").emit("nueva_ficha", result.rows[0])
-    res.json(result.rows[0])
+    const full = await pool.query(`
+      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace,
+        uc.name as creado_por_nombre, uc.email as creado_por_email
+      FROM fichas_tecnicas f
+      LEFT JOIN dependencies d ON d.id = f.dependency_id
+      LEFT JOIN users uc ON uc.id = f.creado_por
+      WHERE f.id = $1
+    `, [result.rows[0].id])
+    req.app.get("io").to("planeacion").emit("nueva_ficha", full.rows[0])
+    res.json(full.rows[0])
   } catch(e) { console.error(e); res.status(500).json({ error: "Error creando ficha" }) }
 }
 
 exports.lista = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace
+      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace,
+        uc.name as creado_por_nombre, uc.email as creado_por_email,
+        ua.name as actualizado_por_nombre, ua.email as actualizado_por_email
       FROM fichas_tecnicas f
       LEFT JOIN dependencies d ON d.id = f.dependency_id
+      LEFT JOIN users uc ON uc.id = f.creado_por
+      LEFT JOIN users ua ON ua.id = f.actualizado_por
       ORDER BY f.created_at DESC
     `)
     res.json(result.rows)
@@ -50,9 +62,13 @@ exports.lista = async (req, res) => {
 exports.porDependencia = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace
+      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace,
+        uc.name as creado_por_nombre, uc.email as creado_por_email,
+        ua.name as actualizado_por_nombre, ua.email as actualizado_por_email
       FROM fichas_tecnicas f
       LEFT JOIN dependencies d ON d.id = f.dependency_id
+      LEFT JOIN users uc ON uc.id = f.creado_por
+      LEFT JOIN users ua ON ua.id = f.actualizado_por
       WHERE f.dependency_id = $1
       ORDER BY f.anio DESC, f.created_at DESC
     `, [req.params.dependency_id])
@@ -65,63 +81,63 @@ exports.actualizar = async (req, res) => {
     const { id } = req.params
     const { comentario_cambio, modificado_por } = req.body
 
-    // 1. Guarda versión actual en historial ANTES de actualizar
     const actual = await pool.query(`SELECT * FROM fichas_tecnicas WHERE id = $1`, [id])
     if (actual.rows.length > 0) {
       const ficha = actual.rows[0]
-
-      // Obtiene la última versión
       const ultVer = await pool.query(
         `SELECT COALESCE(MAX(version),0) as max_ver FROM fichas_tecnicas_historial WHERE ficha_id = $1`, [id]
       )
       const nextVersion = Number(ultVer.rows[0].max_ver) + 1
-
       const histCols = ["ficha_id","version","modificado_por","comentario_cambio", ...CAMPOS_HIST]
-      const histVals = [
-        id, nextVersion,
-        modificado_por || null,
-        comentario_cambio || null,
-        ...CAMPOS_HIST.map(c => ficha[c] ?? null)
-      ]
+      const histVals = [id, nextVersion, modificado_por||null, comentario_cambio||null, ...CAMPOS_HIST.map(c => ficha[c] ?? null)]
       const histParams = histVals.map((_,i) => `$${i+1}`).join(",")
-      await pool.query(
-        `INSERT INTO fichas_tecnicas_historial (${histCols.join(",")}) VALUES (${histParams})`,
-        histVals
-      )
+      await pool.query(`INSERT INTO fichas_tecnicas_historial (${histCols.join(",")}) VALUES (${histParams})`, histVals)
     }
 
-    // 2. Actualiza la ficha actual
     const campos = CAMPOS.filter(c => c !== "creado_por")
     const vals = campos.map(c => req.body[c] ?? null)
     const sets = campos.map((c,i) => `${c}=$${i+1}`).join(",")
+    const extraIdx = vals.length + 1
+    vals.push(modificado_por||null)
     vals.push(id)
     const result = await pool.query(
-      `UPDATE fichas_tecnicas SET ${sets} WHERE id=$${vals.length} RETURNING *`, vals
+      `UPDATE fichas_tecnicas SET ${sets}, actualizado_por=$${extraIdx}, fecha_actualizacion=NOW() WHERE id=$${extraIdx+1} RETURNING *`, vals
     )
-    res.json(result.rows[0])
-  } catch(e) { console.error(e); res.status(500).json({ error: "Error actualizando" }) }
-}
 
-exports.eliminar = async (req, res) => {
-  try {
-    await pool.query(`DELETE FROM fichas_tecnicas WHERE id=$1`, [req.params.id])
-    res.json({ ok: true })
-  } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
+    const full = await pool.query(`
+      SELECT f.*, d.name as dependencia_nombre, d.titular, d.enlace,
+        uc.name as creado_por_nombre, uc.email as creado_por_email,
+        ua.name as actualizado_por_nombre, ua.email as actualizado_por_email
+      FROM fichas_tecnicas f
+      LEFT JOIN dependencies d ON d.id = f.dependency_id
+      LEFT JOIN users uc ON uc.id = f.creado_por
+      LEFT JOIN users ua ON ua.id = f.actualizado_por
+      WHERE f.id = $1
+    `, [result.rows[0].id])
+    res.json(full.rows[0])
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error actualizando" }) }
 }
 
 exports.historial = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT h.*, d.name as dependencia_nombre
+      SELECT h.*, d.name as dependencia_nombre,
+        um.name as modificado_por_nombre, um.email as modificado_por_email
       FROM fichas_tecnicas_historial h
       LEFT JOIN dependencies d ON d.id = h.dependency_id
+      LEFT JOIN users um ON um.id = h.modificado_por
       WHERE h.ficha_id = $1
       ORDER BY h.version DESC
     `, [req.params.ficha_id])
     res.json(result.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: "Error obteniendo historial" }) }
 }
-
+exports.eliminar = async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM fichas_tecnicas WHERE id=$1`, [req.params.id])
+    res.json({ ok: true })
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
+}
 exports.estrategiasPorDependencia = async (req, res) => {
   try {
     const result = await pool.query(`
