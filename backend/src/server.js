@@ -13,6 +13,7 @@ const lineasRoutes= require("./interfaces/http/routes/lineasRoutes")
 const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
 const pmdRoutes = require("./interfaces/http/routes/pmdRoutes")
 const fichasRoutes = require("./interfaces/http/routes/fichasRoutes")
+const transparenciaRoutes = require("./interfaces/http/routes/transparenciaRoutes")
 ///const transporteRoutes = require("./interfaces/http/routes/transporteRoutes")
 const app = express()
 const server = http.createServer(app)
@@ -94,6 +95,8 @@ app.use("/api/pdf", pdfRoutes)
 app.use("/api/pmd", pmdRoutes)
 app.use("/api/fichas", fichasRoutes)
 //app.use('/api/v1/transporte', transporteRoutes);
+app.use("/api/transparencia", transparenciaRoutes)
+
 app.use((req,res)=>{
 
   res.status(404).json({
@@ -111,7 +114,7 @@ app.use((err,req,res,next)=>{
 
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3000
 
 server.listen(PORT,"0.0.0.0",()=>{
 
@@ -119,4 +122,4 @@ server.listen(PORT,"0.0.0.0",()=>{
 
   console.log(`http://localhost:${PORT}`)
 
-})
+}) 

@@ -21,8 +21,8 @@ exports.habilitar = async (req, res) => {
       anio: data.anio,
       trimestre: data.trimestre,
       mensaje: trimestre
-        ? `✅ Tu PDF del T${trimestre}-${anio} fue habilitado`
-        : `✅ Tu PDF del año ${anio} fue habilitado`
+        ? `Tu PDF del T${trimestre}-${anio} fue habilitado`
+        : `Tu PDF del año ${anio} fue habilitado`
     })
 
     res.json(data)

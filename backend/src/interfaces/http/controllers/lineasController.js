@@ -79,13 +79,13 @@ exports.aprobar = async (req, res) => {
       id: linea.id,
       estado: "aprobado",
       lineas_accion: linea.lineas_accion,
-      mensaje: `✅ Tu línea "${linea.lineas_accion}" fue aprobada`
+      mensaje: `✅ Tu línea "${linea.lineas_accion}"ha sido aprobada`
     })
 
     res.json(linea)
   } catch(error) {
     console.error(error)
-    res.status(500).json({ error: "Error aprobando línea" })
+    res.status(500).json({ error: "Error al aprobar la linea de accion" })
   }
 }
 
@@ -111,13 +111,13 @@ exports.rechazar = async (req, res) => {
       estado: "rechazado",
       lineas_accion: linea.lineas_accion,
       comentario: comentario,
-      mensaje: `❌ Tu línea "${linea.lineas_accion}" fue rechazada`
+      mensaje: `❌ Tu línea "${linea.lineas_accion}" ha sido rechazada`
     })
 
     res.json(linea)
   } catch(error) {
     console.error(error)
-    res.status(500).json({ error: "Error rechazando línea" })
+    res.status(500).json({ error: "Error la linea de accion ha sido rechazada" })
   }
 }
   exports.eliminar = async (req, res) => {
@@ -140,6 +140,6 @@ exports.rechazar = async (req, res) => {
 
   } catch(error) {
     console.error(error)
-    res.status(500).json({ error: "Error eliminando línea" })
+    res.status(500).json({ error: "Error eliminando línea de accion" })
   }
 }

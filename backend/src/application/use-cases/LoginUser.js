@@ -13,7 +13,7 @@ class LoginUser {
     const user = await this.userRepository.findByEmail(email)
 
     if(!user){
-      throw new Error("Usuario no encontrado")
+      throw new Error("Usuario no encontrado en la base de datos")
     }
 
     const validPassword = await bcrypt.compare(password, user.password_hash)

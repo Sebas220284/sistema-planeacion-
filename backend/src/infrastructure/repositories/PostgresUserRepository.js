@@ -86,7 +86,7 @@ async findUserWithStrategies(userId){
     s.name as strategy_name,
     s.description,
 
-    p.id as linea_id,        -- ✅ agrega esta línea
+    p.id as linea_id,       
     p.pmd_eje,
     p.pmd_tema,
     p.pmd_politica_publica,
