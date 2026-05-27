@@ -154,3 +154,92 @@ exports.eliminarSeccion5 = async (req, res) => {
     res.json({ ok: true })
   } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
 }
+  exports.getSeccion6 = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, u.name as creado_por_nombre, u.email as creado_por_email
+      FROM transparencia_seccion6 s
+      LEFT JOIN users u ON u.id = s.creado_por
+      ORDER BY s.created_at ASC
+    `)
+    res.json(result.rows)
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error obteniendo sección 6" }) }
+}
+
+exports.crearSeccion6 = async (req, res) => {
+  try {
+    const {
+      ejercicio, fecha_inicio, fecha_termino, nombre_programa,
+      objetivo_institucional, nombre_indicador, dimension,
+      definicion_indicador, metodo_calculo, unidad_medida,
+      frecuencia_medicion, linea_base, metas_programadas,
+      metas_ajustadas, avance_metas, sentido_indicador,
+      fuente_informacion, area_responsable, fecha_actualizacion,
+      nota, creado_por
+    } = req.body
+
+    const result = await pool.query(`
+      INSERT INTO transparencia_seccion6 (
+        ejercicio, fecha_inicio, fecha_termino, nombre_programa,
+        objetivo_institucional, nombre_indicador, dimension,
+        definicion_indicador, metodo_calculo, unidad_medida,
+        frecuencia_medicion, linea_base, metas_programadas,
+        metas_ajustadas, avance_metas, sentido_indicador,
+        fuente_informacion, area_responsable, fecha_actualizacion,
+        nota, creado_por
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+      RETURNING *
+    `, [
+      ejercicio||2025, fecha_inicio||'2025-10-01', fecha_termino||'2025-12-31',
+      nombre_programa||'Programa Operativo Anual',
+      objetivo_institucional, nombre_indicador, dimension||'Gestión',
+      definicion_indicador, metodo_calculo, unidad_medida,
+      frecuencia_medicion||'Trimestral', linea_base||'ND',
+      metas_programadas||0, metas_ajustadas||0, avance_metas||0,
+      sentido_indicador||'Ascendente', fuente_informacion,
+      area_responsable, fecha_actualizacion||'2025-12-31', nota, creado_por||null
+    ])
+    res.json(result.rows[0])
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error creando" }) }
+}
+
+exports.actualizarSeccion6 = async (req, res) => {
+  try {
+    const {
+      ejercicio, fecha_inicio, fecha_termino, nombre_programa,
+      objetivo_institucional, nombre_indicador, dimension,
+      definicion_indicador, metodo_calculo, unidad_medida,
+      frecuencia_medicion, linea_base, metas_programadas,
+      metas_ajustadas, avance_metas, sentido_indicador,
+      fuente_informacion, area_responsable, fecha_actualizacion, nota
+    } = req.body
+
+    const result = await pool.query(`
+      UPDATE transparencia_seccion6 SET
+        ejercicio=$1, fecha_inicio=$2, fecha_termino=$3, nombre_programa=$4,
+        objetivo_institucional=$5, nombre_indicador=$6, dimension=$7,
+        definicion_indicador=$8, metodo_calculo=$9, unidad_medida=$10,
+        frecuencia_medicion=$11, linea_base=$12, metas_programadas=$13,
+        metas_ajustadas=$14, avance_metas=$15, sentido_indicador=$16,
+        fuente_informacion=$17, area_responsable=$18,
+        fecha_actualizacion=$19, nota=$20, updated_at=NOW()
+      WHERE id=$21 RETURNING *
+    `, [
+      ejercicio, fecha_inicio, fecha_termino, nombre_programa,
+      objetivo_institucional, nombre_indicador, dimension,
+      definicion_indicador, metodo_calculo, unidad_medida,
+      frecuencia_medicion, linea_base, metas_programadas,
+      metas_ajustadas, avance_metas, sentido_indicador,
+      fuente_informacion, area_responsable, fecha_actualizacion,
+      nota, req.params.id
+    ])
+    res.json(result.rows[0])
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error actualizando" }) }
+}
+
+exports.eliminarSeccion6 = async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM transparencia_seccion6 WHERE id=$1`, [req.params.id])
+    res.json({ ok: true })
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
+}
