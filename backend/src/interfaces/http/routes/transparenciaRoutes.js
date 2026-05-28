@@ -2,17 +2,20 @@ const express = require("express")
 const router = express.Router()
 const ctrl = require("../controllers/transparenciaController")
 
-// Sección 4
 router.get("/seccion4", ctrl.getSeccion4)
-
-// Sección 5
 router.get("/seccion5", ctrl.getSeccion5)
 router.post("/seccion5", ctrl.crearSeccion5)
 router.put("/seccion5/:id", ctrl.actualizarSeccion5)
 router.delete("/seccion5/:id", ctrl.eliminarSeccion5)
-
-// Config compartida
+router.get("/seccion6",      ctrl.getSeccion6)
+router.post("/seccion6",     ctrl.crearSeccion6)
+router.put("/seccion6/:id",  ctrl.actualizarSeccion6)
+router.delete("/seccion6/:id", ctrl.eliminarSeccion6)
 router.get("/config/:seccion", ctrl.getConfig)
 router.put("/config/:seccion", ctrl.updateConfig)
+router.get("/seccion40",       ctrl.getSeccion40)
+router.post("/seccion40",      ctrl.crearSeccion40)
+router.put("/seccion40/:id",   ctrl.actualizarSeccion40)
+router.delete("/seccion40/:id",ctrl.eliminarSeccion40)
 
 module.exports = router

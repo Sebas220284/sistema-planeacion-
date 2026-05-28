@@ -243,3 +243,87 @@ exports.eliminarSeccion6 = async (req, res) => {
     res.json({ ok: true })
   } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
 }
+
+exports.getSeccion40 = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.*, u.name as creado_por_nombre, u.email as creado_por_email
+      FROM transparencia_seccion40 s
+      LEFT JOIN users u ON u.id = s.creado_por
+      ORDER BY s.created_at ASC
+    `)
+    res.json(result.rows)
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error obteniendo sección 40" }) }
+}
+
+exports.crearSeccion40 = async (req, res) => {
+  try {
+    const {
+      ejercicio, fecha_inicio_periodo, fecha_termino_periodo,
+      denominacion_programa, denominacion_evaluacion, objetivo_general,
+      fecha_inicio_evaluacion, fecha_termino_evaluacion, hipervinculos,
+      area_responsable, fecha_actualizacion, nota, creado_por
+    } = req.body
+
+    const result = await pool.query(`
+      INSERT INTO transparencia_seccion40 (
+        ejercicio, fecha_inicio_periodo, fecha_termino_periodo,
+        denominacion_programa, denominacion_evaluacion, objetivo_general,
+        fecha_inicio_evaluacion, fecha_termino_evaluacion, hipervinculos,
+        area_responsable, fecha_actualizacion, nota, creado_por
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      RETURNING *
+    `, [
+      ejercicio||2025,
+      fecha_inicio_periodo||'2025-10-01',
+      fecha_termino_periodo||'2025-12-31',
+      denominacion_programa,
+      denominacion_evaluacion||null,
+      objetivo_general||null,
+      fecha_inicio_evaluacion||null,
+      fecha_termino_evaluacion||null,
+      hipervinculos||null,
+      area_responsable||'Secretaría de Planeación_Dirección de Seguimiento y Evaluación',
+      fecha_actualizacion||'2025-12-31',
+      nota||null,
+      creado_por||null
+    ])
+    res.json(result.rows[0])
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error creando" }) }
+}
+
+exports.actualizarSeccion40 = async (req, res) => {
+  try {
+    const {
+      ejercicio, fecha_inicio_periodo, fecha_termino_periodo,
+      denominacion_programa, denominacion_evaluacion, objetivo_general,
+      fecha_inicio_evaluacion, fecha_termino_evaluacion, hipervinculos,
+      area_responsable, fecha_actualizacion, nota
+    } = req.body
+
+    const result = await pool.query(`
+      UPDATE transparencia_seccion40 SET
+        ejercicio=$1, fecha_inicio_periodo=$2, fecha_termino_periodo=$3,
+        denominacion_programa=$4, denominacion_evaluacion=$5,
+        objetivo_general=$6, fecha_inicio_evaluacion=$7,
+        fecha_termino_evaluacion=$8, hipervinculos=$9,
+        area_responsable=$10, fecha_actualizacion=$11, nota=$12,
+        updated_at=NOW()
+      WHERE id=$13 RETURNING *
+    `, [
+      ejercicio, fecha_inicio_periodo, fecha_termino_periodo,
+      denominacion_programa, denominacion_evaluacion, objetivo_general,
+      fecha_inicio_evaluacion||null, fecha_termino_evaluacion||null,
+      hipervinculos, area_responsable, fecha_actualizacion, nota,
+      req.params.id
+    ])
+    res.json(result.rows[0])
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error actualizando" }) }
+}
+
+exports.eliminarSeccion40 = async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM transparencia_seccion40 WHERE id=$1`, [req.params.id])
+    res.json({ ok: true })
+  } catch(e) { console.error(e); res.status(500).json({ error: "Error eliminando" }) }
+}
