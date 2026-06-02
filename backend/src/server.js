@@ -14,6 +14,7 @@ const pdfRoutes = require("./interfaces/http/routes/pdfRoutes")
 const pmdRoutes = require("./interfaces/http/routes/pmdRoutes")
 const fichasRoutes = require("./interfaces/http/routes/fichasRoutes")
 const transparenciaRoutes = require("./interfaces/http/routes/transparenciaRoutes")
+const cipRoutes = require("./interfaces/http/routes/cipRoutes")
 ///const transporteRoutes = require("./interfaces/http/routes/transporteRoutes")
 const app = express()
 const server = http.createServer(app)
@@ -96,6 +97,7 @@ app.use("/api/pmd", pmdRoutes)
 app.use("/api/fichas", fichasRoutes)
 //app.use('/api/v1/transporte', transporteRoutes);
 app.use("/api/transparencia", transparenciaRoutes)
+app.use("/api/cip", cipRoutes)
 
 app.use((req,res)=>{
 

@@ -21,6 +21,17 @@ exports.review = async (req, res) => {
       mensaje: `Tu trimestre fue ${data.estado_revision}`
     })
 
+
+ io.to(req.body.dependency_id).emit("planeacion_enviada", {
+      planning_id: data.planning_id,
+      comentario: data.comentario_revision,
+      trimestre: data.trimestre,
+      anio: data.anio,
+      tipo: data.tipo,
+      mensaje: `Trimestre Pendiente por revisar ${data}`
+    })
+
+
     io.to("planeacion").emit("revision-trimestre", data)
 
     res.json(data)

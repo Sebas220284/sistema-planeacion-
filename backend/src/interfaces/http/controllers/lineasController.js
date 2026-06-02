@@ -111,7 +111,7 @@ exports.rechazar = async (req, res) => {
       estado: "rechazado",
       lineas_accion: linea.lineas_accion,
       comentario: comentario,
-      mensaje: `❌ Tu línea "${linea.lineas_accion}" ha sido rechazada`
+      mensaje: ` Tu línea "${linea.lineas_accion}" ha sido rechazada`
     })
 
     res.json(linea)
