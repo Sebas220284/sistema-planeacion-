@@ -3,7 +3,7 @@ services:
   postgres:
     image: postgres:16
     container_name: planeacion_postgres
-
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: COdeRYlUNCHvKqPAfBLSstqQPUAbNkMs
@@ -14,7 +14,30 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+  networks: 
+      - red_sistema
+      
 
 volumes:
   postgres_data:
+
+backend:
+  
+build: .
+container_name: sistema_planeacion_api
+restart: always
+ports:
+ - "3000:3000"
+environment: 
+ DATABASE_URL: postgresql://postgres:COdeRYlUNCHvKqPAfBLSstqQPUAbNkMs@postgres.railway.internal:5432/railway
+ PORT: 3000
+ NODE_ENV: production
+ depends_on:
+ - postgres_db
+ networks:
+  - red_sistema
+ volumes: 
+  postgres_data:
+networks:
+red_sistema:
+ driver:bridge
