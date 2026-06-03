@@ -6,7 +6,7 @@ services:
 
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: milanesa2002
+      POSTGRES_PASSWORD: COdeRYlUNCHvKqPAfBLSstqQPUAbNkMs
       POSTGRES_DB: planeacion_proyectos
 
     ports:
