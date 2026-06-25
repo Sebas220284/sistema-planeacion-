@@ -52,3 +52,5 @@ exports.reportes = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo reportes" })
   }
 }
+
+
