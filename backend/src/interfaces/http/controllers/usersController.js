@@ -1,7 +1,6 @@
 const pool = require("../../../database/postgres")
 const bcrypt = require("bcrypt")
 
-// ── Listar usuarios ──
 exports.listar = async (req, res) => {
   try {
     const r = await pool.query(`
@@ -18,7 +17,6 @@ exports.listar = async (req, res) => {
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
 
-// ── Obtener un usuario ──
 exports.obtener = async (req, res) => {
   try {
     const r = await pool.query(`
@@ -35,7 +33,6 @@ exports.obtener = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Catálogo de roles ──
 exports.getRoles = async (req, res) => {
   try {
     const r = await pool.query(`SELECT id, name, description, level FROM roles ORDER BY level DESC`)
@@ -43,7 +40,6 @@ exports.getRoles = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Crear usuario ──
 exports.crear = async (req, res) => {
   try {
     const { name, email, password, role_id, dependency_id, dependency_position, dependency_role } = req.body
@@ -55,7 +51,6 @@ exports.crear = async (req, res) => {
       return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" })
     }
 
-    // Verifica que el correo no exista ya
     const existe = await pool.query(`SELECT id FROM users WHERE email=$1`, [email])
     if (existe.rows.length > 0) {
       return res.status(400).json({ error: "Ya existe un usuario con ese correo" })
@@ -79,7 +74,6 @@ exports.crear = async (req, res) => {
   }
 }
 
-// ── Actualizar usuario (datos generales, SIN contraseña) ──
 exports.actualizar = async (req, res) => {
   try {
     const { name, email, role_id, dependency_id, dependency_position, dependency_role } = req.body
@@ -88,7 +82,6 @@ exports.actualizar = async (req, res) => {
       return res.status(400).json({ error: "Nombre, correo y rol son obligatorios" })
     }
 
-    // Verifica que el correo no esté usado por OTRO usuario
     const existe = await pool.query(`SELECT id FROM users WHERE email=$1 AND id != $2`, [email, req.params.id])
     if (existe.rows.length > 0) {
       return res.status(400).json({ error: "Ese correo ya está en uso por otro usuario" })
@@ -113,7 +106,6 @@ exports.actualizar = async (req, res) => {
   }
 }
 
-// ── Cambiar contraseña (endpoint separado, por seguridad) ──
 exports.cambiarPassword = async (req, res) => {
   try {
     const { password } = req.body
@@ -137,10 +129,8 @@ exports.cambiarPassword = async (req, res) => {
   }
 }
 
-// ── Eliminar usuario ──
 exports.eliminar = async (req, res) => {
   try {
-    // Protección: no permitir auto-eliminación si viene el id en query
     if (req.query.solicitante_id === req.params.id) {
       return res.status(400).json({ error: "No puedes eliminar tu propio usuario" })
     }
