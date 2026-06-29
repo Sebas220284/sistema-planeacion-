@@ -32,3 +32,39 @@ exports.getByLinea = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo trimestres" })
   }
 }
+// Edición directa por planeación — bypassa el flujo normal de envío/revisión
+exports.editarDirecto = async (req, res) => {
+  try {
+    const { planning_id, anio, trimestre, tipo, valor, comentario } = req.body
+
+    if (!planning_id || !anio || !trimestre || !tipo) {
+      return res.status(400).json({ error: "Faltan datos obligatorios" })
+    }
+
+    const valorLimpio = (valor === "" || valor === null || valor === undefined) ? null : Number(valor)
+
+    const r = await pool.query(`
+      INSERT INTO planning_trimestres (planning_id, anio, trimestre, tipo, valor, comentario, estado_revision, estado_envio)
+      VALUES ($1,$2,$3,$4,$5,$6,'aprobado','enviado')
+      ON CONFLICT (planning_id, anio, trimestre, tipo)
+      DO UPDATE SET valor=$5, comentario=COALESCE($6, planning_trimestres.comentario)
+      RETURNING *
+    `, [planning_id, anio, trimestre, tipo, valorLimpio, comentario || null])
+
+    req.app.get("io").emit("trimestre_actualizado", r.rows[0])
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error editando trimestre:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+// Trae todos los valores de una línea para precargar el modal de edición
+exports.porLineaCompleto = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT * FROM planning_trimestres WHERE planning_id=$1 ORDER BY anio, trimestre, tipo
+    `, [req.params.linea_id])
+    res.json(r.rows)
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}

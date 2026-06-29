@@ -143,3 +143,24 @@ exports.rechazar = async (req, res) => {
     res.status(500).json({ error: "Error eliminando línea de accion" })
   }
 }
+
+exports.actualizarTexto = async (req, res) => {
+  try {
+    const { lineas_accion } = req.body
+    if (!lineas_accion || !lineas_accion.trim()) {
+      return res.status(400).json({ error: "El texto de la línea no puede estar vacío" })
+    }
+    const r = await pool.query(`
+      UPDATE planning_templates SET lineas_accion=$1
+      WHERE id=$2 RETURNING *
+    `, [lineas_accion.trim(), req.params.id])
+
+    if (!r.rows[0]) return res.status(404).json({ error: "Línea no encontrada" })
+
+    req.app.get("io").emit("linea_actualizada", r.rows[0])
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error actualizando línea:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
