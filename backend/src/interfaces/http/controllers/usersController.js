@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt")
 exports.listar = async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role_id, u.dependency_id,
+      SELECT u.id, u.name, u.email, u.role_id, u.dependency_id, u.acceso_restringido, 
         u.dependency_position, u.dependency_role, u.created_at,
         r.name as rol_nombre, r.description as rol_descripcion, r.level as rol_nivel,
         d.name as dependencia_nombre

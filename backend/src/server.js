@@ -18,6 +18,8 @@ const cipRoutes = require("./interfaces/http/routes/cipRoutes")
 const reportesRoutes = require("./interfaces/http/routes/reportesRoutes")
 ///const transporteRoutes = require("./interfaces/http/routes/transporteRoutes")
 const usersRoutes = require("./interfaces/http/routes/usersRoutes")
+const asignacionesRoutes = require("./interfaces/http/routes/asignacionesRoutes")
+
 const app = express()
 const server = http.createServer(app)
 
@@ -102,6 +104,8 @@ app.use("/api/transparencia", transparenciaRoutes)
 app.use("/api/cip", cipRoutes)
 app.use("/api/reportes", reportesRoutes)
 app.use("/api/usuarios", usersRoutes)
+app.use("/api/asignaciones", asignacionesRoutes)
+
 app.use((req,res)=>{
 
   res.status(404).json({
