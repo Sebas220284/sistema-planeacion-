@@ -1,3 +1,4 @@
+const pool = require("../../../database/postgres")
 const PostgresPlanningRepository = require("../../../infrastructure/repositories/PostgresPlanningRepository")
 const SaveTrimestre = require("../../../application/use-cases/SaveTrimestre")
 
