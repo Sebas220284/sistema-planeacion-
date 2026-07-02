@@ -34,7 +34,7 @@ exports.dashboard = async (req, res) => {
     for (const dep of dependencias) {
       const estrategiasResult = await pool.query(`
         SELECT s.*, json_agg(
-          json_build_object('id', pt.id, 'lineas_accion', pt.lineas_accion)
+          json_build_object('id', pt.id, 'lineas_accion', pt.lineas_accion,'unidad_medida', pt.unidad_medida)
         ) FILTER (WHERE pt.id IS NOT NULL) as lineas
         FROM strategies s
         LEFT JOIN planning_templates pt ON pt.strategy_id = s.id AND pt.dependency_id = $1

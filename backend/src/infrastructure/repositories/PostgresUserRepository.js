@@ -98,7 +98,7 @@ async findUserWithStrategies(userId){
     p.columna1,
     p.lineas_accion,
     p.nomenclatura,
-    p.nombre2,
+    p.unidad_medida
     p.responsable,
     p.plazo
 
