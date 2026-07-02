@@ -34,7 +34,7 @@ rows.forEach(r => {
       description: r.description,
       pmd_eje: r.pmd_eje,
       pmd_tema: r.pmd_tema,
-      unidad_medida: r.unidad_medida
+      unidad_medida: r.unidad_medida,
       pmd_politica_publica: r.pmd_politica_publica,
       pmd_objetivo: r.pmd_objetivo,
       pmd_estrategia: r.pmd_estrategia,
