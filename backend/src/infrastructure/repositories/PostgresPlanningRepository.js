@@ -62,7 +62,7 @@ return result.rows
 
 async saveTrimestre(data){
   const { planning_id, anio, trimestre, tipo, valor, comentario } = data
-const valorLimpio= (valor === "" || valor === null || valor === undefined) ? null: Number(valor)
+  const valorLimpio = (valor === "" || valor === null || valor === undefined) ? null : Number(valor)
   const tieneValor = valorLimpio !== null
   const tieneComentario = comentario && comentario.trim() !== ""
 
