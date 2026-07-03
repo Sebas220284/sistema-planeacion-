@@ -57,7 +57,7 @@ exports.getPendientes = async (req, res) => {
       }
     }
     
-    const result = await pool.query(`
+     const result = await pool.query(`
       SELECT 
         p.id,
         p.lineas_accion,
@@ -70,7 +70,7 @@ exports.getPendientes = async (req, res) => {
       LEFT JOIN dependencies d ON d.id = p.dependency_id
       WHERE p.estado = 'pendiente' ${authFilter}
       ORDER BY p.created_at DESC
-    ` ,params)
+   ` , params)
     res.json(result.rows)
   } catch(error) {
     console.error(error)
