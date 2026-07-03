@@ -43,14 +43,14 @@ exports.nueva = async (req, res) => {
 
 exports.getPendientes = async (req, res) => {
   try {
-    const userid = req.query-user_id;
+    const userId= req.query.user_id;
 let authfilter = "*;
 const params = [];
-if (userid){
-const usercheck = await pool.query (`SELECT acceso_restringido FROM users WHERE Id-$1`, [userId]);
-const restringido = userCheck. rows[0]? acceso_restringido;
+if (userId){
+const userCheck = await pool.query (`SELECT acceso_restringido FROM users WHERE id-$1`, [userId]);
+const restringido = userCheck.rows[0]?.acceso_restringido;
 if (restringido) (
-authfilter = `AND p-dependency_id IN (SELECT dependency_id FROM user_ dependencias_asignadas WHERE user_id = $1)`;
+autoFiltre = ` AND p.dependency_id IN (SELECT dependency_id FROM user_ dependencias_asignadas WHERE user_id = $1) `;
 params.push(userId);
 }
 }
@@ -66,9 +66,9 @@ params.push(userId);
       FROM planning_templates p
       LEFT JOIN strategies s ON s.id = p.strategy_id
       LEFT JOIN dependencies d ON d.id = p.dependency_id
-      WHERE p.estado = 'pendiente'
+      WHERE p.estado = 'pendiente' ${authFilter}
       ORDER BY p.created_at DESC
-    `)
+    ` ,params)
     res.json(result.rows)
   } catch(error) {
     console.error(error)
