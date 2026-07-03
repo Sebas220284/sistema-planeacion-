@@ -117,6 +117,7 @@ async findUserWithStrategies(userId){
     ON p.strategy_id = s.id
 
     WHERE u.id = $1
+    ORDER BY s.id, p.nomenclatura
     `,
     [userId]
   )
