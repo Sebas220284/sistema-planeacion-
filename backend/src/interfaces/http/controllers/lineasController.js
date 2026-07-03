@@ -43,6 +43,18 @@ exports.nueva = async (req, res) => {
 
 exports.getPendientes = async (req, res) => {
   try {
+    const userid = req.query-user_id;
+let authfilter = "*;
+const params = [];
+if (userid){
+const usercheck = await pool.query (`SELECT acceso_restringido FROM users WHERE Id-$1`, [userId]);
+const restringido = userCheck. rows[0]? acceso_restringido;
+if (restringido) (
+authfilter = `AND p-dependency_id IN (SELECT dependency_id FROM user_ dependencias_asignadas WHERE user_id = $1)`;
+params.push(userId);
+}
+}
+    
     const result = await pool.query(`
       SELECT 
         p.id,
