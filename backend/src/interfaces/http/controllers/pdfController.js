@@ -51,3 +51,23 @@ exports.getHabilitados = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo PDFs habilitados" })
   }
 }
+
+exports.getTodos = async (req, res) => {
+  try {
+    const { dependency_id } = req.params
+
+    if (!dependency_id || dependency_id === "undefined" || dependency_id === "null") {
+      return res.json([])
+    }
+
+    const result = await pool.query(`
+      SELECT * FROM pdf_habilitados
+      WHERE dependency_id = $1
+      ORDER BY anio DESC, trimestre DESC
+    `, [dependency_id])
+    res.json(result.rows)
+  } catch(error) {
+    console.error(error)
+    res.status(500).json({ error: "Error obteniendo todos los PDFs" })
+  }
+}
