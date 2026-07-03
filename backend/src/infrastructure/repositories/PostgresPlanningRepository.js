@@ -62,8 +62,8 @@ return result.rows
 
 async saveTrimestre(data){
   const { planning_id, anio, trimestre, tipo, valor, comentario } = data
-
-  const tieneValor = Number(valor) > 0
+const valorLimpio= (valor === " || valor === null || valor === undefined) ? null: Number(valor)
+  const tieneValor = valorLimpio !== null
   const tieneComentario = comentario && comentario.trim() !== ""
 
   if(!tieneValor && !tieneComentario) return null
@@ -79,7 +79,7 @@ async saveTrimestre(data){
       estado_envio = 'enviado'::varchar,
       fecha_envio = NOW()
     RETURNING *
-  `, [planning_id, anio, trimestre, tipo, valor, comentario])
+  `, [planning_id, anio, trimestre, tipo, valorLimpio,comentario])
 
   return result.rows[0]
 }
