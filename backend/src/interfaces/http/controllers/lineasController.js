@@ -21,10 +21,10 @@ exports.nueva = async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO planning_templates
-      (strategy_id, dependency_id, lineas_accion, nomenclatura, nombre2, estado)
-      VALUES($1, $2, $3, $3, $3, 'pendiente')
+      (strategy_id, dependency_id, lineas_accion, nomenclatura, nombre2, estado, ejercicio)
+      VALUES($1, $2, $3, $3, $3, 'pendiente', $4)
       RETURNING *
-    `, [estrategia_id, dependency_id, lineas_accion])
+    `, [estrategia_id, dependency_id, lineas_accion, ejercicio || null])
 
     const nuevaLinea = result.rows[0]
 
