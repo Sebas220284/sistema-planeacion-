@@ -84,27 +84,27 @@ async saveTrimestre(data){
   return result.rows[0]
 }
 async reviewTrimestre(data){
-
-const {id,estado,comentario,user_id} = data
-
-const result = await pool.query(
-
-`
-UPDATE planning_trimestres
-SET
-
-estado_revision=$1,
-comentario_revision=$2,
-revisado_por=$3,
-fecha_revision=NOW()
-
-WHERE id=$4
-
-RETURNING *
-`,
-[estado,comentario,user_id,id]
-
-)
+  
+  const {id,estado,comentario,comentario_revision,user_id} = data
+  
+  const result = await pool.query(
+  
+  `
+  UPDATE planning_trimestres
+  SET
+  
+  estado_revision=$1,
+  comentario_revision=$2,
+  revisado_por=$3,
+  fecha_revision=NOW(),
+  comentario=COALESCE($5, comentario)
+  
+  WHERE id=$4
+  
+  RETURNING *
+  `,
+  [estado,comentario_revision,user_id,id,comentario]
+  )
 
 return result.rows[0]
 
