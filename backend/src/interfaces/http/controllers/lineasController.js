@@ -2,7 +2,7 @@ const pool = require("../../../database/postgres")
 
 exports.nueva = async (req, res) => {
   try {
-    const { estrategia_id, lineas_accion } = req.body
+    const { estrategia_id, lineas_accion, ejercicio } = req.body
 
     if(!estrategia_id || !lineas_accion){
       return res.status(400).json({ error: "Faltan datos" })
