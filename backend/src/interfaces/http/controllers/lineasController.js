@@ -178,7 +178,3 @@ exports.actualizarTexto = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> d3f0982a73ccbc76e4655f392ee2283ab959691a
