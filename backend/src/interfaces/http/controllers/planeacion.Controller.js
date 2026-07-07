@@ -76,7 +76,7 @@ ON s.id = p.strategy_id
 LEFT JOIN planning_trimestres t
 ON t.planning_id = p.id
 
-ORDER BY dependencia,anio,trimestre
+ORDER BY d.name, p.nomenclatura, t.anio, t.trimestre
 `
 )
 

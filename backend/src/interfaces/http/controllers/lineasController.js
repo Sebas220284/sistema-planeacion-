@@ -2,7 +2,7 @@ const pool = require("../../../database/postgres")
 
 exports.nueva = async (req, res) => {
   try {
-    const { estrategia_id, lineas_accion } = req.body
+    const { estrategia_id, lineas_accion, ejercicio } = req.body
 
     if(!estrategia_id || !lineas_accion){
       return res.status(400).json({ error: "Faltan datos" })
@@ -21,10 +21,10 @@ exports.nueva = async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO planning_templates
-      (strategy_id, dependency_id, lineas_accion, nomenclatura, nombre2, estado)
-      VALUES($1, $2, $3, $3, $3, 'pendiente')
+      (strategy_id, dependency_id, lineas_accion, nomenclatura, nombre2, estado, ejercicio)
+      VALUES($1, $2, $3, $3, $3, 'pendiente', $4)
       RETURNING *
-    `, [estrategia_id, dependency_id, lineas_accion])
+    `, [estrategia_id, dependency_id, lineas_accion, ejercicio || null])
 
     const nuevaLinea = result.rows[0]
 
@@ -43,7 +43,21 @@ exports.nueva = async (req, res) => {
 
 exports.getPendientes = async (req, res) => {
   try {
-    const result = await pool.query(`
+    const userId = req.query.user_id;
+    let authFilter = "";
+    const params = [];
+    
+    if (userId) {
+      const userCheck = await pool.query(`SELECT acceso_restringido FROM users WHERE id=$1`, [userId]);
+      const restringido = userCheck.rows[0]?.acceso_restringido;
+      
+      if (restringido) {
+        authFilter = ` AND p.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $1) `;
+        params.push(userId);
+      }
+    }
+    
+     const result = await pool.query(`
       SELECT 
         p.id,
         p.lineas_accion,
@@ -54,9 +68,9 @@ exports.getPendientes = async (req, res) => {
       FROM planning_templates p
       LEFT JOIN strategies s ON s.id = p.strategy_id
       LEFT JOIN dependencies d ON d.id = p.dependency_id
-      WHERE p.estado = 'pendiente'
+      WHERE p.estado = 'pendiente' ${authFilter}
       ORDER BY p.created_at DESC
-    `)
+   ` , params)
     res.json(result.rows)
   } catch(error) {
     console.error(error)
@@ -164,4 +178,7 @@ exports.actualizarTexto = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> d3f0982a73ccbc76e4655f392ee2283ab959691a

@@ -17,7 +17,6 @@ const user = {
   name: rows[0].name,
   email: rows[0].email,
   rol: rows[0].role,
-  unidad_medida: rows[0].pt.unidad_medida,
   dependency_id: rows[0].dependency_id, 
   dependencia: rows[0].dependencia,
   titular: rows[0].titular,

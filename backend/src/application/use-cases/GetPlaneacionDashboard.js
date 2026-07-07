@@ -59,6 +59,8 @@ if(r.linea_id){
       responsable: r.responsable,
       plazo: r.plazo,
       estado: r.estado,
+      comentario: r.comentario,
+      comentario_revision: r.comentario_revision,
       comentario_planeacion: r.comentario_planeacion
     })
   }
