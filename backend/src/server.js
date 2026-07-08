@@ -30,6 +30,28 @@ const io = new Server(server,{
     methods:["GET","POST","PUT","DELETE"]
   }
 })
+
+
+const allowedOrigins=[
+"https://planeacion.tuxtla.gob.mx/",
+"http://localhost:5173"
+
+]
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true)
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+
+    return callback(new Error("No permitido por CORS"))
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}))
 app.set("io", io)
 io.on("connection",(socket)=>{
   console.log("Usuario conectado:",socket.id)
@@ -48,11 +70,6 @@ io.on("connection",(socket)=>{
     console.log("Usuario desconectado:",socket.id)
   })
 })
-app.use(cors({
-  origin:"*",
-  methods:["GET","POST","PUT","DELETE"]
-}))
-
 
 const ioTransporte = io.of('/transporte');
 ioTransporte.on('connection', (socket) => {
