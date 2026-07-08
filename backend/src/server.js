@@ -34,7 +34,7 @@ const io = new Server(server,{
 
 const allowedOrigins=[
 "https://planeacion.tuxtla.gob.mx",
-"http://localhost:5173",
+//"http://localhost:5173",
 
 ]
 
