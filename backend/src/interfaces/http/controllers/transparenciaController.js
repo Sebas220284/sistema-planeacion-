@@ -30,51 +30,67 @@ exports.updateConfig = async (req, res) => {
 
 exports.getSeccion4 = async (req, res) => {
   try {
-    const config = await pool.query(`SELECT * FROM transparencia_config WHERE seccion = '4'`)
+    const config = await pool.query(
+      `SELECT * FROM transparencia_config WHERE seccion = '4'`
+    )
     const cfg = config.rows[0] || {}
 
+    // ── Query corregida: sin filtro de estado, trae TODAS las líneas ──
     const datos = await pool.query(`
       SELECT
         pt.id,
-        pt.pmd_objetivo        as descripcion,
-        pt.lineas_accion       as nombre_corto,
-        pt.nombre2             as nombre2,
-        pt.pmd_eje             as eje,
-        pt.pmd_tema            as tema,
-        pt.pmd_estrategia      as estrategia,
-        pt.nomenclatura        as nomenclatura,
-        d.name                 as denominacion_area,
-        d.titular              as titular,
-        d.enlace               as enlace,
-        ROW_NUMBER() OVER (ORDER BY d.name, pt.id) as tabla_campo_id
+        pt.lineas_accion,
+        pt.nombre2,
+        pt.pmd_eje,
+        pt.pmd_tema,
+        pt.pmd_politica_publica,
+        pt.pmd_objetivo,
+        pt.pmd_estrategia,
+        pt.nomenclatura,
+        pt.unidad_medida,
+        pt.estado,
+        d.name       AS denominacion_area,
+        d.titular    AS titular,
+        d.enlace     AS enlace,
+        ROW_NUMBER() OVER (ORDER BY d.name, pt.id) AS num_fila
       FROM planning_templates pt
       JOIN dependencies d ON d.id = pt.dependency_id
-      WHERE pt.estado = 'aprobado'
-      ORDER BY d.name, pt.id
+      ORDER BY d.name, pt.lineas_accion
     `)
+
+    const fmtFecha = (f) => {
+      if (!f) return "-"
+      const d = new Date(f)
+      return `${d.getDate().toString().padStart(2,"0")}/${(d.getMonth()+1).toString().padStart(2,"0")}/${d.getFullYear()}`
+    }
 
     res.json({
       config: cfg,
-      filas: datos.rows.map(row => ({
-        ejercicio:          cfg.ejercicio || 2025,
-        fecha_inicio:       cfg.fecha_inicio ? new Date(cfg.fecha_inicio).toLocaleDateString("es-MX") : "1/1/2025",
-        titulo:             cfg.titulo || "Objetivos y metas institucionales",
-        fecha_termino:      cfg.fecha_termino ? new Date(cfg.fecha_termino).toLocaleDateString("es-MX") : "31/12/2025",
-        denominacion_area:  row.denominacion_area,
-        descripcion:        row.descripcion,
-        nombre_corto:       row.nombre_corto || row.nombre2,
-        tabla_campo_id:     310000 + Number(row.tabla_campo_id),
-        hipervinculos:      cfg.hipervinculos || "",
-        area_responsable:   cfg.area_responsable || "Secretaría de Planeación_Dirección de Seguimiento y Evaluación",
-        fecha_actualizacion: cfg.fecha_actualizacion ? new Date(cfg.fecha_actualizacion).toLocaleDateString("es-MX") : "31/12/2025",
-        nota:               cfg.nota || "",
-        eje:                row.eje,
-        tema:               row.tema,
-        estrategia:         row.estrategia,
-        nomenclatura:       row.nomenclatura,
+      total:  datos.rows.length,
+      filas:  datos.rows.map((row, idx) => ({
+        ejercicio:           cfg.ejercicio            || 2025,
+        fecha_inicio:        fmtFecha(cfg.fecha_inicio) !== "-" ? fmtFecha(cfg.fecha_inicio) : "1/1/2025",
+        titulo:              cfg.titulo               || "Objetivos y metas institucionales",
+        fecha_termino:       fmtFecha(cfg.fecha_termino) !== "-" ? fmtFecha(cfg.fecha_termino) : "31/12/2025",
+        denominacion_area:   row.denominacion_area    || "",
+        descripcion:         row.pmd_objetivo         || row.lineas_accion || "-",
+        nombre_corto:        row.lineas_accion        || row.nombre2 || "-",
+        tabla_campo_id:      310000 + (idx + 1),
+        hipervinculos:       cfg.hipervinculos        || "",
+        area_responsable:    cfg.area_responsable     || "Secretaría de Planeación_Dirección de Seguimiento y Evaluación",
+        fecha_actualizacion: fmtFecha(cfg.fecha_actualizacion) !== "-" ? fmtFecha(cfg.fecha_actualizacion) : "31/12/2025",
+        nota:                cfg.nota                 || "",
+        // campos extra para filtros en frontend
+        eje:                 row.pmd_eje              || "",
+        tema:                row.pmd_tema             || "",
+        estrategia:          row.pmd_estrategia       || "",
+        estado_linea:        row.estado               || "",
       }))
     })
-  } catch(e) { console.error(e); res.status(500).json({ error: "Error generando sección 4" }) }
+  } catch(e) {
+    console.error("Error sección 4:", e)
+    res.status(500).json({ error: e.message })
+  }
 }
 exports.getSeccion5 = async (req, res) => {
   try {
