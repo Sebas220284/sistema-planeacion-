@@ -20,6 +20,7 @@ const reportesRoutes = require("./interfaces/http/routes/reportesRoutes")
 const usersRoutes = require("./interfaces/http/routes/usersRoutes")
 const asignacionesRoutes = require("./interfaces/http/routes/asignacionesRoutes")
 const dependenciasRoutes = require("./interfaces/http/routes/dependenciasRoutes")
+const odsRoutes = require("./interfaces/http/routes/odsRoutes")
 
 const app = express()
 const server = http.createServer(app)
@@ -125,7 +126,7 @@ app.use("/api/reportes", reportesRoutes)
 app.use("/api/usuarios", usersRoutes)
 app.use("/api/asignaciones", asignacionesRoutes)
 app.use("/api/dependencias", dependenciasRoutes)
-
+app.use("/api/ods", odsRoutes)
 app.use((req,res)=>{
 
   res.status(404).json({
