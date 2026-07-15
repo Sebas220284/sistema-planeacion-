@@ -1,4 +1,5 @@
 const pool = require("../../../database/postgres")
+const NotificationService = require("../../../application/services/NotificationService")
 
 exports.nueva = async (req, res) => {
   try {
@@ -89,12 +90,20 @@ exports.aprobar = async (req, res) => {
 
     const linea = result.rows[0]
 
-    req.app.get("io").to(linea.dependency_id).emit("linea_revisada", {
+    const io = req.app.get("io")
+    io.to(linea.dependency_id).emit("linea_revisada", {
       id: linea.id,
       estado: "aprobado",
       lineas_accion: linea.lineas_accion,
-      mensaje: `✅ Tu línea "${linea.lineas_accion}"ha sido aprobada`
+      mensaje: `✅ Tu línea "${linea.lineas_accion}" ha sido aprobada`
     })
+
+    await NotificationService.sendNotification(io, {
+      dependency_id: linea.dependency_id,
+      tipo: 'revision_linea',
+      titulo: 'Línea de Acción Aprobada',
+      mensaje: `Tu línea "${linea.lineas_accion}" ha sido aprobada.`,
+    }, linea.dependency_id)
 
     res.json(linea)
   } catch(error) {
@@ -120,13 +129,21 @@ exports.rechazar = async (req, res) => {
 
     const linea = result.rows[0]
 
-    req.app.get("io").to(linea.dependency_id).emit("linea_revisada", {
+    const io = req.app.get("io")
+    io.to(linea.dependency_id).emit("linea_revisada", {
       id: linea.id,
       estado: "rechazado",
       lineas_accion: linea.lineas_accion,
       comentario: comentario,
-      mensaje: ` Tu línea "${linea.lineas_accion}" ha sido rechazada`
+      mensaje: `❌ Tu línea "${linea.lineas_accion}" ha sido rechazada`
     })
+
+    await NotificationService.sendNotification(io, {
+      dependency_id: linea.dependency_id,
+      tipo: 'revision_linea',
+      titulo: 'Línea de Acción Observada',
+      mensaje: `Tu línea "${linea.lineas_accion}" tiene observaciones: ${comentario || ''}`,
+    }, linea.dependency_id)
 
     res.json(linea)
   } catch(error) {
