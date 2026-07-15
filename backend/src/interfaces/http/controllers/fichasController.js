@@ -1,7 +1,7 @@
 const pool = require("../../../database/postgres")
 
 const CAMPOS = [
-  "dependency_id","nombre_indicador","definicion","proposito","formula",
+  "dependency_id","planning_template_id","nombre_indicador","definicion","proposito","formula",
   "eje","tema","politica_publica","objetivo","estrategia",
   "anio","tipo_evaluacion","periodicidad","tipo_indicador","informe_gobierno",
   "anio_base","valor_anio_base","valor_minimo","valor_inicial","avance_anual",
@@ -12,7 +12,7 @@ const CAMPOS = [
 ]
 
 const CAMPOS_HIST = [
-  "dependency_id","nombre_indicador","definicion","proposito","formula",
+  "dependency_id","planning_template_id","nombre_indicador","definicion","proposito","formula",
   "eje","tema","politica_publica","objetivo","estrategia",
   "anio","tipo_evaluacion","periodicidad","tipo_indicador","informe_gobierno",
   "anio_base","valor_anio_base","valor_minimo","valor_inicial","avance_anual",
