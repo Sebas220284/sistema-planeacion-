@@ -20,6 +20,7 @@ const reportesRoutes = require("./interfaces/http/routes/reportesRoutes")
 const usersRoutes = require("./interfaces/http/routes/usersRoutes")
 const asignacionesRoutes = require("./interfaces/http/routes/asignacionesRoutes")
 const dependenciasRoutes = require("./interfaces/http/routes/dependenciasRoutes")
+const notificacionesRoutes = require("./interfaces/http/routes/notificacionesRoutes")
 const odsRoutes = require("./interfaces/http/routes/odsRoutes")
 
 const app = express()
@@ -126,6 +127,7 @@ app.use("/api/reportes", reportesRoutes)
 app.use("/api/usuarios", usersRoutes)
 app.use("/api/asignaciones", asignacionesRoutes)
 app.use("/api/dependencias", dependenciasRoutes)
+app.use("/api/notificaciones", notificacionesRoutes)
 app.use("/api/ods", odsRoutes)
 app.use((req,res)=>{
 
