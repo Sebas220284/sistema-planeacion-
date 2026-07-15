@@ -1,6 +1,7 @@
 const pool = require("../../../database/postgres")
 const PostgresPlanningRepository = require("../../../infrastructure/repositories/PostgresPlanningRepository")
 const SaveTrimestre = require("../../../application/use-cases/SaveTrimestre")
+const NotificationService = require("../../../application/services/NotificationService")
 
 const repository = new PostgresPlanningRepository()
 
@@ -10,12 +11,20 @@ exports.save = async (req, res) => {
     const data = await useCase.execute(req.body)
 
     if(data){ 
-      req.app.get("io").to("planeacion").emit("dependencia_envio_planeacion", {
+      const io = req.app.get("io")
+      
+      io.to("planeacion").emit("dependencia_envio_planeacion", {
         planning_id: data.planning_id,
         fecha_envio: data.fecha_envio,
         mensaje: "Una dependencia actualizó su planeación"
       })
-      req.app.get("io").emit("trimestre_actualizado", data)
+      io.emit("trimestre_actualizado", data)
+
+      await NotificationService.sendNotification(io, {
+        tipo: 'envio_trimestre',
+        titulo: 'Actualización de Planeación',
+        mensaje: `Se ha actualizado un trimestre (T${data.trimestre} - ${data.anio}).`,
+      }, "planeacion")
     }
 
     res.json(data || {})
