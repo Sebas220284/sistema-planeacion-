@@ -21,7 +21,8 @@ const usersRoutes = require("./interfaces/http/routes/usersRoutes")
 const asignacionesRoutes = require("./interfaces/http/routes/asignacionesRoutes")
 const dependenciasRoutes = require("./interfaces/http/routes/dependenciasRoutes")
 const odsRoutes = require("./interfaces/http/routes/odsRoutes")
-
+const chatRoutes = require("./interfaces/http/routes/chatRoutes")
+const lineasSolRoutes = require("./interfaces/http/routes/lineasSolicitudesRoutes")
 const app = express()
 const server = http.createServer(app)
 
@@ -127,6 +128,90 @@ app.use("/api/usuarios", usersRoutes)
 app.use("/api/asignaciones", asignacionesRoutes)
 app.use("/api/dependencias", dependenciasRoutes)
 app.use("/api/ods", odsRoutes)
+app.use("/api/chat", chatRoutes)
+app.use("/api/lineas-solicitudes", lineasSolRoutes)
+
+io.on("connection", (socket) => {
+
+  socket.on("chat_join", ({ dependency_id, user_id, rol }) => {
+    const sala = `chat_dep_${dependency_id}`
+    socket.join(sala)
+    socket.join("chat_planeacion") 
+    console.log(`Chat: user ${user_id} (${rol}) unido a sala ${sala}`)
+  })
+
+  socket.on("chat_mensaje", async (data) => {
+    const {
+      conversacion_id, dependency_id,
+      remitente_id, remitente_nombre, remitente_rol,
+      contenido, tipo = "texto"
+    } = data
+
+    if (!contenido?.trim() && tipo === "texto") return
+
+    try {
+      const pool = require("./database/postgres")
+
+      const msgRes = await pool.query(`
+        INSERT INTO chat_mensajes
+          (conversacion_id, remitente_id, remitente_nombre, remitente_rol,
+           dependency_id, contenido, tipo,
+           leido_planeacion, leido_dependencia)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        RETURNING *
+      `, [
+        conversacion_id, remitente_id || null, remitente_nombre,
+        remitente_rol, dependency_id, contenido.trim(), tipo,
+        remitente_rol === "planeacion" || remitente_rol === "admin",  
+        remitente_rol === "dependencias"  
+      ])
+
+      const mensaje = msgRes.rows[0]
+
+      const esPlaneacion = ["planeacion","admin"].includes(remitente_rol)
+      await pool.query(`
+        UPDATE chat_conversaciones SET
+          ultimo_mensaje = $1,
+          ultimo_mensaje_at = NOW(),
+          mensajes_no_leidos_planeacion = CASE
+            WHEN $2 THEN mensajes_no_leidos_planeacion
+            ELSE mensajes_no_leidos_planeacion + 1
+          END,
+          mensajes_no_leidos_dependencia = CASE
+            WHEN $2 THEN mensajes_no_leidos_dependencia + 1
+            ELSE mensajes_no_leidos_dependencia
+          END
+        WHERE id = $3
+      `, [contenido.trim().substring(0, 100), esPlaneacion, conversacion_id])
+
+      const sala = `chat_dep_${dependency_id}`
+      io.to(sala).emit("chat_nuevo_mensaje", mensaje)
+      io.to("chat_planeacion").emit("chat_nuevo_mensaje", mensaje)
+
+      if (!esPlaneacion) {
+        io.to("chat_planeacion").emit("chat_badge_update", {
+          dependency_id,
+          conversacion_id
+        })
+      }
+
+    } catch(e) {
+      console.error("Error guardando mensaje chat:", e)
+      socket.emit("chat_error", { mensaje: "Error al enviar el mensaje" })
+    }
+  })
+
+ 
+  socket.on("chat_escribiendo", ({ dependency_id, nombre, escribiendo }) => {
+    const sala = `chat_dep_${dependency_id}`
+    socket.to(sala).emit("chat_escribiendo", { nombre, escribiendo })
+    socket.to("chat_planeacion").emit("chat_escribiendo", { dependency_id, nombre, escribiendo })
+  })
+
+  socket.on("disconnect", () => {})
+})
+
+
 app.use((req,res)=>{
 
   res.status(404).json({

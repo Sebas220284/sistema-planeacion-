@@ -152,3 +152,194 @@ exports.estrategiasPorDependencia = async (req, res) => {
     res.json(result.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: "Error" }) }
 }
+
+exports.lineasPorDependencia = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        pt.id,
+        pt.lineas_accion,
+        pt.nombre2,
+        pt.pmd_eje,
+        pt.pmd_tema,
+        pt.pmd_politica_publica,
+        pt.pmd_objetivo,
+        pt.pmd_estrategia,
+        pt.unidad_medida,
+        pt.nomenclatura,
+        pt.ejercicio,
+        s.name AS strategy_nombre,
+        s.id   AS strategy_id
+      FROM planning_templates pt
+      LEFT JOIN strategies s ON s.id = pt.strategy_id
+      WHERE pt.dependency_id = $1
+      ORDER BY pt.pmd_eje, pt.pmd_estrategia, pt.lineas_accion
+    `, [req.params.dependency_id])
+
+    res.json(r.rows)
+  } catch(e) {
+    console.error("Error lineas por dep:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+
+exports.datosParaFicha = async (req, res) => {
+  try {
+    const { planning_id, anio } = req.params
+    const anioNum = parseInt(anio) || new Date().getFullYear()
+
+    const linea = await pool.query(`
+      SELECT
+        pt.*,
+        d.name    AS dependencia_nombre,
+        d.titular AS dependencia_titular,
+        d.enlace  AS dependencia_enlace,
+        s.name    AS strategy_nombre
+      FROM planning_templates pt
+      JOIN dependencies d ON d.id = pt.dependency_id
+      LEFT JOIN strategies s ON s.id = pt.strategy_id
+      WHERE pt.id = $1
+    `, [planning_id])
+
+    if (!linea.rows[0]) {
+      return res.status(404).json({ error: "Línea de acción no encontrada" })
+    }
+
+    const l = linea.rows[0]
+
+    const trimestres = await pool.query(`
+      SELECT trimestre, tipo, valor, anio
+      FROM planning_trimestres
+      WHERE planning_id = $1 AND anio = $2
+      ORDER BY trimestre, tipo
+    `, [planning_id, anioNum])
+
+    const datosT = { programado:{1:0,2:0,3:0,4:0}, ejecutado:{1:0,2:0,3:0,4:0} }
+    trimestres.rows.forEach(t => {
+      if (datosT[t.tipo] && t.trimestre >= 1 && t.trimestre <= 4) {
+        datosT[t.tipo][t.trimestre] = Number(t.valor || 0)
+      }
+    })
+
+    const totalProgramado = Object.values(datosT.programado).reduce((s,v)=>s+v, 0)
+    const totalEjecutado  = Object.values(datosT.ejecutado ).reduce((s,v)=>s+v, 0)
+    const valorInicial    = datosT.programado[1] || 0
+
+    const mesesPorTrimestre = {
+      1: ["enero","febrero","marzo"],
+      2: ["abril","mayo","junio"],
+      3: ["julio","agosto","septiembre"],
+      4: ["octubre","noviembre","diciembre"]
+    }
+
+    const calendarizacion = {}
+    ;[1,2,3,4].forEach(t => {
+      const meses = mesesPorTrimestre[t]
+      const progT = datosT.programado[t]
+      const ejecT = datosT.ejecutado[t]
+      meses.forEach(mes => {
+        calendarizacion[mes] = {
+          programado: Math.round(progT / 3),
+          real:       Math.round(ejecT / 3)
+        }
+      })
+    })
+
+    res.json({
+      nombre_indicador:   l.lineas_accion || l.nombre2 || "",
+      definicion:         l.lineas_accion || "",
+      proposito:          l.pmd_objetivo  || "",
+      formula:            `(Número de ${l.unidad_medida || "acciones"} realizadas / Número de ${l.unidad_medida || "acciones"} programadas) * 100`,
+      unidad_medida:      l.unidad_medida || "",
+      medios_verificacion: "Informe de actividades / Reportes de seguimiento",
+
+      pmd_eje:              l.pmd_eje              || "",
+      pmd_tema:             l.pmd_tema             || "",
+      pmd_politica_publica: l.pmd_politica_publica || "",
+      pmd_objetivo:         l.pmd_objetivo         || "",
+      pmd_estrategia:       l.pmd_estrategia       || "",
+      strategy_id:          l.strategy_id          || null,
+      strategy_nombre:      l.strategy_nombre      || "",
+
+      dependency_id:       l.dependency_id,
+      dependencia_nombre:  l.dependencia_nombre,
+      responsable:         l.dependencia_titular   || "",
+      correo_electronico:  l.dependencia_enlace    || "",
+
+      anio:                anioNum,
+      periodicidad:        "Trimestral",
+      tipo_indicador:      "Gestión",
+      tipo_evaluacion:     "Porcentaje",
+
+      valor_inicial:   valorInicial,
+      avance_anual:    totalEjecutado,
+      meta_anual:      totalProgramado,
+      meta_trianual:   totalProgramado * 3,
+      anio_base:       anioNum - 1,
+      valor_anio_base: 0,
+      valor_minimo:    0,
+
+      calendarizacion,
+
+      trimestres_raw: datosT,
+      planning_template_id: planning_id,
+
+      resumen_trimestral: [1,2,3,4].map(t => ({
+        trimestre:   t,
+        programado:  datosT.programado[t],
+        ejecutado:   datosT.ejecutado[t],
+        cumplimiento: datosT.programado[t] > 0
+          ? Math.round((datosT.ejecutado[t] / datosT.programado[t]) * 100)
+          : 0
+      }))
+    })
+  } catch(e) {
+    console.error("Error datos para ficha:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+
+exports.listaConPOA = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        f.*,
+        d.name  AS dependencia_nombre,
+        d.titular, d.enlace,
+        uc.name  AS creado_por_nombre,
+        uc.email AS creado_por_email,
+        ua.name  AS actualizado_por_nombre,
+        ua.email AS actualizado_por_email,
+        pt.lineas_accion AS poa_linea,
+        pt.ejercicio     AS poa_ejercicio,
+        -- Suma de ejecutado del año desde trimestres
+        COALESCE((
+          SELECT SUM(tr.valor)
+          FROM planning_trimestres tr
+          WHERE tr.planning_id = f.planning_template_id
+            AND tr.tipo = 'ejecutado'
+            AND tr.anio = f.anio
+        ), 0) AS ejecutado_real_poa,
+        -- Suma de programado del año desde trimestres
+        COALESCE((
+          SELECT SUM(tr.valor)
+          FROM planning_trimestres tr
+          WHERE tr.planning_id = f.planning_template_id
+            AND tr.tipo = 'programado'
+            AND tr.anio = f.anio
+        ), 0) AS programado_real_poa
+      FROM fichas_tecnicas f
+      LEFT JOIN dependencies d   ON d.id  = f.dependency_id
+      LEFT JOIN users uc          ON uc.id = f.creado_por
+      LEFT JOIN users ua          ON ua.id = f.actualizado_por
+      LEFT JOIN planning_templates pt ON pt.id = f.planning_template_id
+      ORDER BY f.created_at DESC
+    `)
+    res.json(r.rows)
+  } catch(e) {
+    console.error(e)
+    res.status(500).json({ error: e.message })
+  }
+}
