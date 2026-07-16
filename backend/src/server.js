@@ -24,6 +24,7 @@ const notificacionesRoutes = require("./interfaces/http/routes/notificacionesRou
 const odsRoutes = require("./interfaces/http/routes/odsRoutes")
 const chatRoutes = require("./interfaces/http/routes/chatRoutes")
 const lineasSolRoutes = require("./interfaces/http/routes/lineasSolicitudesRoutes")
+const ponderacionRoutes = require("./interfaces/http/routes/ponderacionRoutes")
 const app = express()
 const server = http.createServer(app)
 
@@ -132,6 +133,7 @@ app.use("/api/notificaciones", notificacionesRoutes)
 app.use("/api/ods", odsRoutes)
 app.use("/api/chat", chatRoutes)
 app.use("/api/lineas-solicitudes", lineasSolRoutes)
+app.use("/api/ponderacion", ponderacionRoutes)
 
 io.on("connection", (socket) => {
 
