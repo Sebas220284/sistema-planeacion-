@@ -11,5 +11,6 @@ router.get("/historial/:ficha_id", controller.historial)
 router.get("/estrategias/:dependency_id", controller.estrategiasPorDependencia)
 router.get("/lineas-por-dep/:dependency_id",   controller.lineasPorDependencia)
 router.get("/datos-para-ficha/:planning_id/:anio", controller.datosParaFicha)
+router.get("/datos-para-estrategia/:strategy_id/:anio", controller.datosParaEstrategia)
 router.get("/lista-con-poa",                   controller.listaConPOA)
 module.exports = router
