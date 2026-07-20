@@ -318,7 +318,9 @@ exports.datosParaEstrategia = async (req, res) => {
         MAX(pt.pmd_tema) as pmd_tema,
         MAX(pt.pmd_politica_publica) as pmd_politica_publica,
         MAX(pt.pmd_objetivo) as pmd_objetivo,
-        MAX(pt.pmd_estrategia) as pmd_estrategia
+        MAX(pt.pmd_estrategia) as pmd_estrategia,
+        MAX(pt.unidad_medida) as unidad_medida,
+        MAX(pt.lineas_accion) as lineas_accion
       FROM strategies s
       JOIN planning_templates pt ON pt.strategy_id = s.id
       JOIN dependencies d ON d.id = pt.dependency_id
@@ -373,6 +375,13 @@ exports.datosParaEstrategia = async (req, res) => {
     });
 
     res.json({
+      nombre_indicador:   est.strategy_nombre || est.lineas_accion || "",
+      definicion:         est.strategy_nombre || est.lineas_accion || "",
+      proposito:          est.pmd_objetivo  || "",
+      formula:            est.unidad_medida ? `(Número de ${est.unidad_medida} realizadas / Número de ${est.unidad_medida} programadas) * 100` : "",
+      unidad_medida:      est.unidad_medida || "",
+      medios_verificacion: "Informe de actividades / Reportes de seguimiento",
+
       pmd_eje:              est.pmd_eje              || "",
       pmd_tema:             est.pmd_tema             || "",
       pmd_politica_publica: est.pmd_politica_publica || "",
@@ -387,6 +396,9 @@ exports.datosParaEstrategia = async (req, res) => {
       correo_electronico:  est.dependencia_enlace    || "",
 
       anio:                anioNum,
+      periodicidad:        "Trimestral",
+      tipo_indicador:      "Gestión",
+      tipo_evaluacion:     "Porcentaje",
 
       valor_inicial:       valorInicial,
       meta_anual:          totalProgramado,
