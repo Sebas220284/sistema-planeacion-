@@ -141,13 +141,12 @@ exports.eliminar = async (req, res) => {
 exports.estrategiasPorDependencia = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT DISTINCT p.strategy_id, p.pmd_eje as eje, p.pmd_tema as tema,
-        p.pmd_politica_publica as politica_publica, p.pmd_objetivo as objetivo,
-        p.pmd_estrategia as estrategia, s.name as strategy_name
-      FROM planning_templates p
-      LEFT JOIN strategies s ON s.id = p.strategy_id
+      SELECT s.id as strategy_id, s.name as strategy_name, s.name as estrategia
+      FROM strategies s
+      JOIN planning_templates p ON p.strategy_id = s.id
       WHERE p.dependency_id=$1 AND p.pmd_estrategia IS NOT NULL
-      ORDER BY p.pmd_eje, p.pmd_estrategia
+      GROUP BY s.id, s.name
+      ORDER BY s.name
     `, [req.params.dependency_id])
     res.json(result.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: "Error" }) }
