@@ -24,7 +24,7 @@ const CAMPOS_HIST = [
 
 exports.crear = async (req, res) => {
   try {
-    const vals = CAMPOS.map(c => req.body[c] ?? null)
+    const vals = CAMPOS.map(c => (req.body[c] === "" ? null : (req.body[c] ?? null)))
     const cols = CAMPOS.join(",")
     const params = CAMPOS.map((_,i) => `$${i+1}`).join(",")
     const result = await pool.query(
@@ -95,7 +95,7 @@ exports.actualizar = async (req, res) => {
     }
 
     const campos = CAMPOS.filter(c => c !== "creado_por")
-    const vals = campos.map(c => req.body[c] ?? null)
+    const vals = campos.map(c => (req.body[c] === "" ? null : (req.body[c] ?? null)))
     const sets = campos.map((c,i) => `${c}=$${i+1}`).join(",")
     const extraIdx = vals.length + 1
     vals.push(modificado_por||null)
@@ -373,13 +373,6 @@ exports.datosParaEstrategia = async (req, res) => {
     });
 
     res.json({
-      nombre_indicador:   est.strategy_nombre || "",
-      definicion:         est.strategy_nombre || "",
-      proposito:          est.pmd_objetivo  || "",
-      formula:            `(Número de acciones realizadas / Número de acciones programadas) * 100`,
-      unidad_medida:      "acciones",
-      medios_verificacion: "Informe de actividades / Reportes de seguimiento",
-
       pmd_eje:              est.pmd_eje              || "",
       pmd_tema:             est.pmd_tema             || "",
       pmd_politica_publica: est.pmd_politica_publica || "",
@@ -394,9 +387,6 @@ exports.datosParaEstrategia = async (req, res) => {
       correo_electronico:  est.dependencia_enlace    || "",
 
       anio:                anioNum,
-      periodicidad:        "Trimestral",
-      tipo_indicador:      "Gestión",
-      tipo_evaluacion:     "Porcentaje",
 
       valor_inicial:       valorInicial,
       meta_anual:          totalProgramado,
