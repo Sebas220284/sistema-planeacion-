@@ -6,15 +6,21 @@ const userRepository = new PostgresUserRepository()
 
 
 exports.login = async (req,res) => {
-
-  const { email, password } = req.body
-
-  const loginUser = new LoginUser(userRepository)
-
-  const token = await loginUser.execute(email,password)
-
-  res.json({ token })
-
+  
+  try {
+    const { email, password } = req.body
+    
+    const loginUser = new LoginUser(userRepository)
+    
+    const token = await loginUser.execute(email,password)
+    
+    res.json({ token })
+    
+  } catch(error) {
+    res.status(400).json({ error: error.message })
+    
+  }
+  
 }
 
 exports.me = async (req,res)=>{
