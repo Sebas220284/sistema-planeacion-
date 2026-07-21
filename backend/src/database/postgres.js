@@ -1,45 +1,51 @@
-
+const path = require("path");
+const crypto = require("crypto");
 const { Pool } = require("pg");
+
+const envPath = path.resolve(__dirname, "../../.env");
+
+const result = require("dotenv").config({
+  path: envPath,
+  override: true,
+});
+
+if (result.error) {
+  console.error("No se pudo cargar el .env:", result.error);
+}
+
+const password = process.env.DB_PASSWORD || "";
+
+console.log("Diagnóstico de conexión:", {
+  envPath,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  database: process.env.DB_NAME,
+  passwordExiste: password.length > 0,
+  passwordLength: password.length,
+
+  // No muestra la contraseña; solo permite comparar si cambió.
+  passwordHash: crypto
+    .createHash("sha256")
+    .update(password)
+    .digest("hex")
+    .substring(0, 10),
+});
 
 const pool = new Pool({
   host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || "5432"),
+  port: Number(process.env.DB_PORT),
   user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  password,
   database: process.env.DB_NAME,
-  //ssl: {
-  //  rejectUnauthorized: false
- // }
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  connectionTimeoutMillis: 15000,
 });
 
-console.log("Intentando conectar a DB en:", process.env.DB_HOST || "ERROR: VARIABLE VACÍA");
-async function testDB() {
-  try {
+pool.on("error", (error) => {
+  console.error("Error inesperado PostgreSQL:", error.message);
+});
 
-    const db = await pool.query("SELECT current_database()")
-    console.log("DATABASE:", db.rows)
-
-    const tables = await pool.query(`
-      SELECT table_schema, table_name
-      FROM information_schema.tables
-      WHERE table_name='users'
-    `)
-
-    console.log("TABLES:", tables.rows)
-
-  } catch (err) {
-    console.error("DB ERROR:", err)
-  }
-  const res = await pool.query(`
-SELECT 
-current_database(),
-current_user,
-inet_server_addr(),
-inet_server_port()
-`)
-console.log(res.rows)
-}
-
-testDB()
-
-module.exports = pool
+module.exports = pool;
