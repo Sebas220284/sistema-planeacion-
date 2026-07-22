@@ -2,14 +2,12 @@ const express = require("express")
 const router = express.Router()
 const ctrl = require("../controllers/cipController")
 
-// Catálogos
 router.get("/catalogos/programas",     ctrl.getCatProgramas)
 router.get("/catalogos/subprogramas/:prog", ctrl.getCatSubprogramas)
 router.get("/catalogos/partidas",      ctrl.getCatPartidas)
 router.get("/catalogos/fuentes",       ctrl.getCatFuentes)
 router.get("/catalogos/pmd/:dep_id",   ctrl.getPMDPorDependencia)
 
-// CIP CRUD
 router.get("/",               ctrl.listar)
 router.get("/:id",            ctrl.obtener)
 router.post("/",              ctrl.crear)
@@ -17,7 +15,6 @@ router.put("/:id",            ctrl.actualizar)
 router.delete("/:id",         ctrl.eliminar)
 router.put("/:id/estado",     ctrl.cambiarEstado)
 
-// Sub-recursos
 router.get("/:id/desglose",        ctrl.getDesglose)
 router.post("/:id/desglose",       ctrl.agregarDesglose)
 router.put("/desglose/:did",       ctrl.actualizarDesglose)
@@ -30,5 +27,11 @@ router.delete("/metas/:mid",       ctrl.eliminarMeta)
 router.get("/catalogos/dependencias", ctrl.getDependencias)
 router.get("/:id/exportar", ctrl.obtenerParaExportar)
 
-
+router.put("/:id/enviar",           ctrl.enviarRevision)
+router.put("/:id/aprobar",          ctrl.aprobarCIP)
+router.put("/:id/rechazar",         ctrl.rechazarCIP)
+router.put("/:id/toggle-pdf",       ctrl.togglePDF)
+router.put("/:id/regresar-borrador",ctrl.regresarBorrador)
+router.get("/:id/historial",        ctrl.getHistorial)
+router.get("/stats/revision",       ctrl.getStatsRevision)
 module.exports = router

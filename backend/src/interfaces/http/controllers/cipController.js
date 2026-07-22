@@ -409,3 +409,212 @@ exports.eliminarMeta = async (req, res) => {
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
+
+const guardarHistorial = async (pool, proyecto_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, comentario, pdf_habilitado) => {
+  await pool.query(`
+    INSERT INTO cip_historial_estados
+      (proyecto_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, comentario, pdf_habilitado)
+    VALUES ($1,$2,$3,$4,$5,$6,$7)
+  `, [proyecto_id, estado_anterior||null, estado_nuevo, usuario_id||null, usuario_nombre||null, comentario||null, pdf_habilitado||null])
+}
+
+exports.enviarRevision = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { enviado_por_nombre } = req.body
+
+    const actual = await pool.query(`SELECT estado, nombre_proyecto, dependency_id FROM cip_proyectos WHERE id=$1`, [id])
+    if (!actual.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
+
+    const { estado, nombre_proyecto, dependency_id } = actual.rows[0]
+    if (!["borrador","rechazado"].includes(estado)) {
+      return res.status(400).json({ error: `No se puede enviar desde el estado "${estado}"` })
+    }
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos
+      SET estado='enviado', fecha_envio=NOW(), updated_at=NOW()
+      WHERE id=$1 RETURNING *
+    `, [id])
+
+    await guardarHistorial(pool, id, estado, "enviado", null, enviado_por_nombre||"Dependencia", "Enviado a revisión de Planeación", null)
+
+    const io = req.app.get("io")
+    io.to("planeacion").emit("cip_enviado_revision", {
+      ...r.rows[0],
+      dependencia_nombre: r.rows[0].dependencia_nombre || "Dependencia"
+    })
+    io.to("inversion_publica").emit("cip_enviado_revision", r.rows[0])
+
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error enviar CIP:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.aprobarCIP = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { revisado_por, revisado_por_nombre, comentario } = req.body
+
+    const actual = await pool.query(`SELECT estado FROM cip_proyectos WHERE id=$1`, [id])
+    if (!actual.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
+    if (actual.rows[0].estado !== "enviado") {
+      return res.status(400).json({ error: "Solo se pueden aprobar CIPs en estado 'enviado'" })
+    }
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos
+      SET estado='aprobado', revisado_por=$1,
+          comentario_revision=$2, fecha_revision=NOW(), updated_at=NOW()
+      WHERE id=$3 RETURNING *
+    `, [revisado_por||null, comentario||null, id])
+
+    await guardarHistorial(pool, id, "enviado", "aprobado", revisado_por, revisado_por_nombre, comentario, null)
+
+    const io = req.app.get("io")
+    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_aprobado", r.rows[0])
+    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_aprobado", r.rows[0])
+    io.to("planeacion").emit("cip_estado_cambio", r.rows[0])
+
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error aprobar CIP:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.rechazarCIP = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { revisado_por, revisado_por_nombre, comentario_revision } = req.body
+
+    if (!comentario_revision?.trim()) {
+      return res.status(400).json({ error: "El motivo del rechazo es obligatorio" })
+    }
+
+    const actual = await pool.query(`SELECT estado FROM cip_proyectos WHERE id=$1`, [id])
+    if (!actual.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
+    if (actual.rows[0].estado !== "enviado") {
+      return res.status(400).json({ error: "Solo se pueden rechazar CIPs en estado 'enviado'" })
+    }
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos
+      SET estado='rechazado', revisado_por=$1,
+          comentario_revision=$2, fecha_revision=NOW(),
+          pdf_habilitado=FALSE, updated_at=NOW()
+      WHERE id=$3 RETURNING *
+    `, [revisado_por||null, comentario_revision.trim(), id])
+
+    await guardarHistorial(pool, id, "enviado", "rechazado", revisado_por, revisado_por_nombre, comentario_revision, false)
+
+    const io = req.app.get("io")
+    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_rechazado", r.rows[0])
+    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_rechazado", r.rows[0])
+    io.to("planeacion").emit("cip_estado_cambio", r.rows[0])
+
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error rechazar CIP:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.togglePDF = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { habilitar, habilitado_por, habilitado_por_nombre } = req.body
+
+    const actual = await pool.query(`SELECT estado, pdf_habilitado, nombre_proyecto FROM cip_proyectos WHERE id=$1`, [id])
+    if (!actual.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
+
+    if (actual.rows[0].estado !== "aprobado" && habilitar) {
+      return res.status(400).json({ error: "Solo se puede habilitar el PDF de CIPs aprobadas" })
+    }
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos
+      SET pdf_habilitado=$1,
+          pdf_habilitado_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
+          pdf_habilitado_por = CASE WHEN $1 THEN $2 ELSE NULL END,
+          updated_at=NOW()
+      WHERE id=$3 RETURNING *
+    `, [habilitar, habilitado_por||null, id])
+
+    await guardarHistorial(
+      pool, id, null,
+      habilitar ? "pdf_habilitado" : "pdf_deshabilitado",
+      habilitado_por, habilitado_por_nombre,
+      habilitar ? "PDF habilitado para descarga" : "PDF deshabilitado",
+      habilitar
+    )
+
+    const io = req.app.get("io")
+    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_pdf_toggle", r.rows[0])
+    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_pdf_toggle", r.rows[0])
+
+    res.json({
+      ...r.rows[0],
+      mensaje: habilitar
+        ? "✅ PDF habilitado. La dependencia ya puede descargarlo."
+        : "🔒 PDF deshabilitado. La dependencia no puede descargarlo."
+    })
+  } catch(e) {
+    console.error("Error toggle PDF:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.regresarBorrador = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { usuario_nombre } = req.body
+
+    const actual = await pool.query(`SELECT estado FROM cip_proyectos WHERE id=$1`, [id])
+    if (!actual.rows[0]) return res.status(404).json({ error: "No encontrada" })
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos
+      SET estado='borrador', pdf_habilitado=FALSE,
+          pdf_habilitado_at=NULL, pdf_habilitado_por=NULL,
+          comentario_revision=NULL, updated_at=NOW()
+      WHERE id=$1 RETURNING *
+    `, [id])
+
+    await guardarHistorial(pool, id, actual.rows[0].estado, "borrador", null, usuario_nombre, "Regresado a borrador", false)
+
+    req.app.get("io").emit("cip_estado_cambio", r.rows[0])
+    res.json(r.rows[0])
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}
+
+exports.getHistorial = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT h.*, u.name AS usuario_nombre_bd
+      FROM cip_historial_estados h
+      LEFT JOIN users u ON u.id = h.usuario_id
+      WHERE h.proyecto_id = $1
+      ORDER BY h.created_at ASC
+    `, [req.params.id])
+    res.json(r.rows)
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}
+
+exports.getStatsRevision = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE estado='borrador')::int  AS borradores,
+        COUNT(*) FILTER (WHERE estado='enviado')::int   AS enviados,
+        COUNT(*) FILTER (WHERE estado='aprobado')::int  AS aprobados,
+        COUNT(*) FILTER (WHERE estado='rechazado')::int AS rechazados,
+        COUNT(*) FILTER (WHERE pdf_habilitado=TRUE)::int AS con_pdf_habilitado
+      FROM cip_proyectos
+    `)
+    res.json(r.rows[0])
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}
