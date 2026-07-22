@@ -475,8 +475,7 @@ exports.aprobarCIP = async (req, res) => {
     await guardarHistorial(pool, id, "enviado", "aprobado", revisado_por, revisado_por_nombre, comentario, null)
 
     const io = req.app.get("io")
-    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_aprobado", r.rows[0])
-    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_aprobado", r.rows[0])
+    io.to(r.rows[0].dependency_id.toString()).emit("cip_aprobado", r.rows[0])
     io.to("planeacion").emit("cip_estado_cambio", r.rows[0])
 
     res.json(r.rows[0])
@@ -512,8 +511,7 @@ exports.rechazarCIP = async (req, res) => {
     await guardarHistorial(pool, id, "enviado", "rechazado", revisado_por, revisado_por_nombre, comentario_revision, false)
 
     const io = req.app.get("io")
-    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_rechazado", r.rows[0])
-    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_rechazado", r.rows[0])
+    io.to(r.rows[0].dependency_id.toString()).emit("cip_rechazado", r.rows[0])
     io.to("planeacion").emit("cip_estado_cambio", r.rows[0])
 
     res.json(r.rows[0])
@@ -553,8 +551,7 @@ exports.togglePDF = async (req, res) => {
     )
 
     const io = req.app.get("io")
-    io.to(`room_${r.rows[0].dependency_id}`).emit("cip_pdf_toggle", r.rows[0])
-    io.to(`dep_${r.rows[0].dependency_id}`).emit("cip_pdf_toggle", r.rows[0])
+    io.to(r.rows[0].dependency_id.toString()).emit("cip_pdf_toggle", r.rows[0])
 
     res.json({
       ...r.rows[0],
