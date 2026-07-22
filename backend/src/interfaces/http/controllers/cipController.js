@@ -150,7 +150,7 @@ exports.obtenerParaExportar = async (req, res) => {
 
 const CAMPOS_CIP = [
   "anio","folio","clave_programa","clave_subprograma","dependency_id",
-  "unidad_responsable","ods","plan_nacional","plan_estatal","plan_municipal",
+  "unidad_responsable","ods","ods_meta","ods_indicador","plan_nacional","plan_estatal","plan_municipal",
   "pmd_eje","pmd_tema","pmd_politica_publica","pmd_objetivo","pmd_estrategia",
   "pmd_lineas_accion","strategy_id","nombre_proyecto","localidad",
   "fuente_financiamiento_1","fuente_porcentaje_1",
