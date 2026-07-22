@@ -409,7 +409,7 @@ exports.eliminarMeta = async (req, res) => {
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
-<<<<<<< HEAD
+
 
 const guardarHistorial = async (pool, proyecto_id, estado_anterior, estado_nuevo, usuario_id, usuario_nombre, comentario, pdf_habilitado) => {
   await pool.query(`
@@ -619,5 +619,3 @@ exports.getStatsRevision = async (req, res) => {
     res.json(r.rows[0])
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
-=======
->>>>>>> b379114deffe84d2db2e5aa4c6e22f4e405c4e07
