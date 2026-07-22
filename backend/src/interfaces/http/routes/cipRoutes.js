@@ -34,4 +34,6 @@ router.put("/:id/toggle-pdf",       ctrl.togglePDF)
 router.put("/:id/regresar-borrador",ctrl.regresarBorrador)
 router.get("/:id/historial",        ctrl.getHistorial)
 router.get("/stats/revision",       ctrl.getStatsRevision)
+router.get("/:id/waypoints",      ctrl.getWaypoints)
+router.put("/:id/waypoints",      ctrl.guardarWaypoints)
 module.exports = router

@@ -616,3 +616,61 @@ exports.getStatsRevision = async (req, res) => {
     res.json(r.rows[0])
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
+
+exports.guardarWaypoints = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { waypoints, descripcion_ruta, distancia_km } = req.body
+
+    if (!Array.isArray(waypoints)) {
+      return res.status(400).json({ error: "waypoints debe ser un array" })
+    }
+
+    const r = await pool.query(`
+      UPDATE cip_proyectos SET
+        micro_waypoints              = $1,
+        georef_micro_descripcion_ruta = $2,
+        georef_micro_distancia_km     = $3,
+        updated_at = NOW()
+      WHERE id = $4 RETURNING id, nombre_proyecto,
+        micro_waypoints, georef_micro_descripcion_ruta,
+        georef_micro_distancia_km
+    `, [
+      JSON.stringify(waypoints),
+      descripcion_ruta || null,
+      distancia_km     || null,
+      id
+    ])
+
+    if (!r.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
+    res.json(r.rows[0])
+  } catch(e) {
+    console.error("Error guardando waypoints:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.getWaypoints = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT id, nombre_proyecto,
+        georef_macro_lat, georef_macro_lng, georef_macro_localidad,
+        georef_micro_lat, georef_micro_lng, georef_micro_localidad,
+        micro_waypoints,
+        georef_micro_descripcion_ruta,
+        georef_micro_distancia_km
+      FROM cip_proyectos WHERE id = $1
+    `, [req.params.id])
+
+    if (!r.rows[0]) return res.status(404).json({ error: "No encontrado" })
+
+    const row = r.rows[0]
+    if (typeof row.micro_waypoints === "string") {
+      try { row.micro_waypoints = JSON.parse(row.micro_waypoints) }
+      catch { row.micro_waypoints = [] }
+    }
+    if (!Array.isArray(row.micro_waypoints)) row.micro_waypoints = []
+
+    res.json(row)
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}
