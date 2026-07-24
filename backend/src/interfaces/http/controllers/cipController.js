@@ -529,10 +529,6 @@ exports.togglePDF = async (req, res) => {
     const actual = await pool.query(`SELECT estado, pdf_habilitado, nombre_proyecto FROM cip_proyectos WHERE id=$1`, [id])
     if (!actual.rows[0]) return res.status(404).json({ error: "CIP no encontrada" })
 
-    if (actual.rows[0].estado !== "aprobado" && habilitar) {
-      return res.status(400).json({ error: "Solo se puede habilitar el PDF de CIPs aprobadas" })
-    }
-
     const r = await pool.query(`
       UPDATE cip_proyectos
       SET pdf_habilitado=$1,
