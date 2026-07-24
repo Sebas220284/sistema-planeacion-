@@ -463,3 +463,375 @@ exports.listaConPOA = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+
+
+
+exports.ponderacionPorEstrategia = async (req, res) => {
+  try {
+    const { dependency_id } = req.params
+    const anio_inicio = parseInt(req.query.anio_inicio) || 2024
+    const anio_fin    = parseInt(req.query.anio_fin)    || 2026
+
+    const rawData = await pool.query(`
+      SELECT
+        pt.strategy_id,
+        s.name                             AS strategy_nombre,
+        pt.pmd_eje,
+        pt.pmd_tema,
+        pt.pmd_politica_publica,
+        pt.pmd_objetivo,
+        pt.pmd_estrategia,
+        tr.anio,
+        tr.tipo,
+        COALESCE(SUM(tr.valor), 0)         AS total_valor,
+        COUNT(DISTINCT pt.id)::int         AS total_lineas
+      FROM planning_templates pt
+      JOIN strategies s ON s.id = pt.strategy_id
+      LEFT JOIN planning_trimestres tr
+        ON tr.planning_id = pt.id
+        AND tr.anio BETWEEN $2 AND $3
+      WHERE pt.dependency_id = $1
+        AND pt.strategy_id IS NOT NULL
+      GROUP BY
+        pt.strategy_id, s.name,
+        pt.pmd_eje, pt.pmd_tema, pt.pmd_politica_publica,
+        pt.pmd_objetivo, pt.pmd_estrategia,
+        tr.anio, tr.tipo
+      ORDER BY pt.pmd_eje, s.name, tr.anio
+    `, [dependency_id, anio_inicio, anio_fin])
+
+    if (rawData.rows.length === 0) {
+      return res.json({
+        dependency_id, anio_inicio, anio_fin,
+        gran_total_programado: 0,
+        estrategias: [],
+        mensaje: "Sin datos de programado para este período"
+      })
+    }
+
+    const mapaEstrategias = new Map()
+
+    rawData.rows.forEach(row => {
+      const key = row.strategy_id
+      if (!mapaEstrategias.has(key)) {
+        mapaEstrategias.set(key, {
+          strategy_id:          row.strategy_id,
+          strategy_nombre:      row.strategy_nombre,
+          pmd_eje:              row.pmd_eje              || "",
+          pmd_tema:             row.pmd_tema             || "",
+          pmd_politica_publica: row.pmd_politica_publica || "",
+          pmd_objetivo:         row.pmd_objetivo         || "",
+          pmd_estrategia:       row.pmd_estrategia       || "",
+          total_lineas:         row.total_lineas         || 0,
+          programado_trianual:  0,
+          ejecutado_trianual:   0,
+          por_anio: {}        
+        })
+      }
+
+      const est = mapaEstrategias.get(key)
+
+      if (row.anio && !est.por_anio[row.anio]) {
+        est.por_anio[row.anio] = { programado: 0, ejecutado: 0 }
+      }
+
+      const valor = Number(row.total_valor || 0)
+      if (row.anio && row.tipo === "programado") {
+        est.programado_trianual += valor
+        est.por_anio[row.anio].programado += valor
+      }
+      if (row.anio && row.tipo === "ejecutado") {
+        est.ejecutado_trianual += valor
+        if (est.por_anio[row.anio]) {
+          est.por_anio[row.anio].ejecutado += valor
+        }
+      }
+    })
+
+    const granTotal = Array.from(mapaEstrategias.values())
+      .reduce((s, e) => s + e.programado_trianual, 0)
+
+ 
+    const estrategias = Array.from(mapaEstrategias.values())
+      .filter(e => e.programado_trianual > 0)  
+      .map(e => {
+        const ponderacion = granTotal > 0
+          ? Math.round((e.programado_trianual / granTotal) * 10000) / 100
+          : 0
+
+        const porcentaje_cumplimiento = e.programado_trianual > 0
+          ? Math.min(
+              Math.round((e.ejecutado_trianual / e.programado_trianual) * 10000) / 100,
+              100
+            )
+          : 0
+
+        const avance_ponderado =
+          Math.round((porcentaje_cumplimiento / 100) * ponderacion * 100) / 100
+
+        const por_anio_calc = {}
+        Object.entries(e.por_anio).forEach(([año, vals]) => {
+          const pct_año = vals.programado > 0
+            ? Math.min(
+                Math.round((vals.ejecutado / vals.programado) * 10000) / 100,
+                100
+              )
+            : 0
+          const pond_año = granTotal > 0
+            ? Math.round((vals.programado / granTotal) * 10000) / 100
+            : 0
+
+          por_anio_calc[año] = {
+            programado:             Math.round(vals.programado * 100) / 100,
+            ejecutado:              Math.round(vals.ejecutado  * 100) / 100,
+            porcentaje_cumplimiento: pct_año,
+            ponderacion_anual:      pond_año,
+            avance_ponderado_anual: Math.round((pct_año / 100) * pond_año * 100) / 100
+          }
+        })
+
+        return {
+          ...e,
+          ponderacion:             ponderacion,
+          porcentaje_cumplimiento: porcentaje_cumplimiento,
+          avance_ponderado:        avance_ponderado,
+          por_anio:                por_anio_calc,
+          semaforo:                getSemaforoFicha(porcentaje_cumplimiento)
+        }
+      })
+      .sort((a, b) => b.ponderacion - a.ponderacion)
+
+    const sumaPonderaciones = estrategias.reduce((s, e) => s + e.ponderacion, 0)
+    const avancePonderadoGlobal = estrategias.reduce((s, e) => s + e.avance_ponderado, 0)
+
+    res.json({
+      dependency_id,
+      anio_inicio,
+      anio_fin,
+      gran_total_programado:   Math.round(granTotal * 100) / 100,
+      suma_ponderaciones:      Math.round(sumaPonderaciones * 100) / 100,
+      avance_ponderado_global: Math.round(avancePonderadoGlobal * 100) / 100,
+      total_estrategias:       estrategias.length,
+      semaforo_global:         getSemaforoFicha(avancePonderadoGlobal),
+      estrategias
+    })
+  } catch(e) {
+    console.error("Error ponderación estrategia:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.datosEstrategiaParaFicha = async (req, res) => {
+  try {
+    const { strategy_id, dependency_id } = req.params
+    const anio_inicio = parseInt(req.query.anio_inicio) || 2024
+    const anio_fin    = parseInt(req.query.anio_fin)    || 2026
+
+    const estRes = await pool.query(`
+      SELECT s.*, d.name AS dep_nombre, d.titular, d.enlace
+      FROM strategies s
+      JOIN dependencies d ON d.id = s.dependency_id
+      WHERE s.id = $1
+    `, [strategy_id])
+
+    if (!estRes.rows[0]) {
+      return res.status(404).json({ error: "Estrategia no encontrada" })
+    }
+    const estrategia = estRes.rows[0]
+
+    const lineasRes = await pool.query(`
+      SELECT pt.id, pt.lineas_accion, pt.pmd_eje, pt.pmd_tema,
+        pt.pmd_politica_publica, pt.pmd_objetivo, pt.pmd_estrategia,
+        pt.unidad_medida
+      FROM planning_templates pt
+      WHERE pt.strategy_id = $1 AND pt.dependency_id = $2
+      ORDER BY pt.lineas_accion
+    `, [strategy_id, dependency_id])
+
+    const lineasIds = lineasRes.rows.map(l => l.id)
+
+    if (lineasIds.length === 0) {
+      return res.status(400).json({ error: "Esta estrategia no tiene líneas de acción" })
+    }
+
+    const trimRes = await pool.query(`
+      SELECT planning_id, anio, trimestre, tipo,
+        COALESCE(valor, 0) AS valor
+      FROM planning_trimestres
+      WHERE planning_id = ANY($1)
+        AND anio BETWEEN $2 AND $3
+      ORDER BY anio, trimestre, tipo
+    `, [lineasIds, anio_inicio, anio_fin])
+
+    const resumen = {}
+    for (let a = anio_inicio; a <= anio_fin; a++) {
+      resumen[a] = {
+        programado: { 1:0, 2:0, 3:0, 4:0 },
+        ejecutado:  { 1:0, 2:0, 3:0, 4:0 }
+      }
+    }
+
+    trimRes.rows.forEach(t => {
+      const año = t.anio
+      if (resumen[año] && resumen[año][t.tipo] && t.trimestre >= 1 && t.trimestre <= 4) {
+        resumen[año][t.tipo][t.trimestre] += Number(t.valor || 0)
+      }
+    })
+
+    let programado_trianual = 0
+    let ejecutado_trianual  = 0
+    const por_anio = {}
+
+    Object.entries(resumen).forEach(([año, datos]) => {
+      const prog_año = Object.values(datos.programado).reduce((s,v)=>s+v, 0)
+      const ejec_año = Object.values(datos.ejecutado ).reduce((s,v)=>s+v, 0)
+      programado_trianual += prog_año
+      ejecutado_trianual  += ejec_año
+      por_anio[año] = { programado: prog_año, ejecutado: ejec_año }
+    })
+
+    const totalDepRes = await pool.query(`
+      SELECT COALESCE(SUM(tr.valor), 0) AS gran_total
+      FROM planning_templates pt
+      JOIN planning_trimestres tr ON tr.planning_id = pt.id
+      WHERE pt.dependency_id = $1
+        AND tr.tipo = 'programado'
+        AND tr.anio BETWEEN $2 AND $3
+    `, [dependency_id, anio_inicio, anio_fin])
+
+    const granTotal = Number(totalDepRes.rows[0]?.gran_total || 0)
+
+    const ponderacion = granTotal > 0
+      ? Math.round((programado_trianual / granTotal) * 10000) / 100
+      : 0
+
+    const porcentaje_cumplimiento = programado_trianual > 0
+      ? Math.min(
+          Math.round((ejecutado_trianual / programado_trianual) * 10000) / 100,
+          100
+        )
+      : 0
+
+    const avance_ponderado =
+      Math.round((porcentaje_cumplimiento / 100) * ponderacion * 100) / 100
+
+    const mesesT = {
+      1:["enero","febrero","marzo"],
+      2:["abril","mayo","junio"],
+      3:["julio","agosto","septiembre"],
+      4:["octubre","noviembre","diciembre"]
+    }
+    const calendarizacion = {}
+    const anioActual = new Date().getFullYear()
+    const datosAnioActual = resumen[anioActual] || resumen[anio_inicio] || {}
+
+    ;[1,2,3,4].forEach(t => {
+      const prog = datosAnioActual.programado?.[t] || 0
+      const ejec = datosAnioActual.ejecutado?.[t]  || 0
+      mesesT[t].forEach(mes => {
+        calendarizacion[mes] = {
+          programado: Math.round(prog / 3),
+          real:       Math.round(ejec / 3)
+        }
+      })
+    })
+
+    const primeraLinea = lineasRes.rows[0] || {}
+
+    res.json({
+      nombre_indicador:    `Indicador de cumplimiento: ${estrategia.name}`,
+      definicion:          primeraLinea.pmd_objetivo || estrategia.name,
+      proposito:           `Medir el avance de la estrategia "${estrategia.name}" durante el período ${anio_inicio}-${anio_fin}`,
+      formula:             `(Suma ejecutado trianual / Suma programado trianual) × 100`,
+      unidad_medida:       primeraLinea.unidad_medida || "Porcentaje",
+      medios_verificacion: "Reportes trimestrales POA / Informes de seguimiento",
+
+      pmd_eje:              primeraLinea.pmd_eje              || "",
+      pmd_tema:             primeraLinea.pmd_tema             || "",
+      pmd_politica_publica: primeraLinea.pmd_politica_publica || "",
+      pmd_objetivo:         primeraLinea.pmd_objetivo         || "",
+      pmd_estrategia:       primeraLinea.pmd_estrategia       || "",
+
+      dependency_id,
+      dependencia_nombre:   estrategia.dep_nombre,
+      responsable:          estrategia.titular  || "",
+      correo_electronico:   estrategia.enlace   || "",
+
+      strategy_id,
+      strategy_nombre:      estrategia.name,
+      anio_inicio, anio_fin,
+      total_lineas:         lineasIds.length,
+      lineas:               lineasRes.rows,
+
+      anio:                 anioActual,
+      anio_base:            anio_inicio - 1,
+      valor_anio_base:      0,
+      valor_minimo:         0,
+      valor_inicial:        Math.round(
+        (Object.values(resumen[anio_inicio]?.programado||{}).reduce((s,v)=>s+v,0)) * 100
+      ) / 100,
+      meta_anual:           Math.round(
+        Object.values(resumen[anioActual]?.programado||{}).reduce((s,v)=>s+v,0) * 100
+      ) / 100,
+      avance_anual:         Math.round(
+        Object.values(resumen[anioActual]?.ejecutado||{}).reduce((s,v)=>s+v,0) * 100
+      ) / 100,
+      meta_trianual:        Math.round(programado_trianual * 100) / 100,
+
+      programado_trianual:  Math.round(programado_trianual * 100) / 100,
+      ejecutado_trianual:   Math.round(ejecutado_trianual  * 100) / 100,
+      gran_total_dep:       Math.round(granTotal           * 100) / 100,
+      ponderacion:          ponderacion,
+      porcentaje_cumplimiento: porcentaje_cumplimiento,
+      avance_ponderado:     avance_ponderado,
+      semaforo:             getSemaforoFicha(porcentaje_cumplimiento),
+
+      por_anio,
+      resumen_trimestral:   Object.entries(resumen[anioActual]?.programado||{}).map(([t,v])=>({
+        trimestre:   Number(t),
+        programado:  v,
+        ejecutado:   resumen[anioActual]?.ejecutado?.[t] || 0,
+        cumplimiento: v > 0
+          ? Math.min(Math.round(((resumen[anioActual]?.ejecutado?.[t]||0)/v)*10000)/100, 100)
+          : 0
+      })),
+
+      calendarizacion,
+    })
+  } catch(e) {
+    console.error("Error datos estrategia para ficha:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.estrategiasPorDependencia = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT DISTINCT
+        s.id           AS strategy_id,
+        s.name         AS strategy_nombre,
+        pt.pmd_eje,
+        pt.pmd_tema,
+        pt.pmd_politica_publica,
+        pt.pmd_objetivo,
+        pt.pmd_estrategia,
+        COUNT(pt.id)::int AS total_lineas
+      FROM strategies s
+      JOIN planning_templates pt ON pt.strategy_id = s.id
+      WHERE pt.dependency_id = $1
+      GROUP BY s.id, s.name, pt.pmd_eje, pt.pmd_tema,
+        pt.pmd_politica_publica, pt.pmd_objetivo, pt.pmd_estrategia
+      ORDER BY pt.pmd_eje, s.name
+    `, [req.params.dependency_id])
+
+    res.json(r.rows)
+  } catch(e) { res.status(500).json({ error: e.message }) }
+}
+
+const getSemaforoFicha = (pct) => {
+  const p = Number(pct)
+  if (p >= 90) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢" }
+  if (p >= 70) return { color:"#d97706", bg:"#fef3c7", label:"Bueno",   emoji:"🟡" }
+  if (p >= 50) return { color:"#f59e0b", bg:"#fffbeb", label:"Regular", emoji:"🟠" }
+  return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",    emoji:"🔴" }
+}

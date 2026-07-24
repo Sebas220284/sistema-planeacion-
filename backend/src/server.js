@@ -135,6 +135,7 @@ app.use("/api/chat", chatRoutes)
 app.use("/api/lineas-solicitudes", lineasSolRoutes)
 app.use("/api/ponderacion", ponderacionRoutes)
 
+
 io.on("connection", (socket) => {
 
   socket.on("chat_join", ({ dependency_id, user_id, rol }) => {
