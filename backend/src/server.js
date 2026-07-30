@@ -84,7 +84,7 @@ ioTransporte.on('connection', (socket) => {
         ioTransporte.emit('bus_moviéndose', coords);
     });
 });
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 async function checkDatabase(){
 
   try{
