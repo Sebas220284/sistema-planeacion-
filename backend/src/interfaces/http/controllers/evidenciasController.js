@@ -2,7 +2,6 @@ const pool = require("../../../database/postgres")
 
 const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
 
-// ── Sube una evidencia ──
 exports.subir = async (req, res) => {
   try {
     const { id: proyecto_id } = req.params
@@ -17,7 +16,6 @@ exports.subir = async (req, res) => {
       return res.status(400).json({ error: "No se recibió ninguna imagen" })
     }
 
-    // Valida tamaño: base64 → bytes aprox = (length * 3) / 4
     const bytesAprox = imagen_tamano
       ? Number(imagen_tamano)
       : Math.round((imagen_base64.length * 3) / 4)
@@ -28,13 +26,11 @@ exports.subir = async (req, res) => {
       })
     }
 
-    // Verifica que sea imagen
     const tiposPermitidos = ["image/jpeg","image/jpg","image/png","image/webp"]
     if (imagen_tipo && !tiposPermitidos.includes(imagen_tipo.toLowerCase())) {
       return res.status(400).json({ error: "Solo se permiten imágenes JPG, PNG o WEBP" })
     }
 
-    // Verifica que el proyecto existe
     const proy = await pool.query(`SELECT id FROM cip_proyectos WHERE id=$1`, [proyecto_id])
     if (!proy.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
 
@@ -64,7 +60,6 @@ exports.subir = async (req, res) => {
       subido_por_nombre || null
     ])
 
-    // Notifica en tiempo real
     req.app.get("io").emit("cip_nueva_evidencia", {
       proyecto_id,
       evidencia: r.rows[0]
@@ -77,7 +72,6 @@ exports.subir = async (req, res) => {
   }
 }
 
-// ── Lista evidencias de un proyecto (SIN base64 para no saturar) ──
 exports.listar = async (req, res) => {
   try {
     const r = await pool.query(`
@@ -95,7 +89,6 @@ exports.listar = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Obtiene una evidencia CON base64 (para ver/descargar) ──
 exports.obtener = async (req, res) => {
   try {
     const r = await pool.query(`
@@ -107,7 +100,6 @@ exports.obtener = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Actualiza metadatos (sin cambiar la imagen) ──
 exports.actualizar = async (req, res) => {
   try {
     const { titulo, descripcion, seccion, lat, lng, direccion } = req.body
@@ -127,7 +119,6 @@ exports.actualizar = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Elimina una evidencia ──
 exports.eliminar = async (req, res) => {
   try {
     await pool.query(`DELETE FROM cip_evidencias WHERE id=$1`, [req.params.eid])
@@ -135,14 +126,13 @@ exports.eliminar = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-// ── Resumen de evidencias por sección ──
 exports.resumen = async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT
         seccion,
-        COUNT(*)::int          AS total,
-        COUNT(lat)::int        AS con_georef,
+        COUNT(*)::int AS total,
+        COUNT(lat)::int AS con_georef,
         SUM(imagen_tamano)::int AS bytes_total
       FROM cip_evidencias
       WHERE proyecto_id = $1
