@@ -1,6 +1,11 @@
 const pool = require("../../../database/postgres")
+const fs = require("fs")
+const path = require("path")
 
 const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
+
+// Directorio donde se guardarán las fotos si la carpeta existe
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "evidencias");
 
 exports.subir = async (req, res) => {
   try {
@@ -26,6 +31,19 @@ exports.subir = async (req, res) => {
       })
     }
 
+    // Extraer base64 crudo para validarlo y guardarlo
+    const base64Data = imagen_base64.replace(/^data:image\/\w+;base64,/, "");
+
+    // Verificación explícita de "Magic Number" (Firma binaria del archivo)
+    // Esto evita que suban un .docx o .exe renombrado a .jpg
+    const isJPG = base64Data.startsWith("/9j/");
+    const isPNG = base64Data.startsWith("iVBORw0KGgo");
+    const isWEBP = base64Data.startsWith("UklGR");
+
+    if (!isJPG && !isPNG && !isWEBP) {
+      return res.status(400).json({ error: "El archivo no es una imagen real válida, se detectó un formato falso." });
+    }
+
     const tiposPermitidos = ["image/jpeg","image/jpg","image/png","image/webp"]
     if (imagen_tipo && !tiposPermitidos.includes(imagen_tipo.toLowerCase())) {
       return res.status(400).json({ error: "Solo se permiten imágenes JPG, PNG o WEBP" })
@@ -33,6 +51,25 @@ exports.subir = async (req, res) => {
 
     const proy = await pool.query(`SELECT id FROM cip_proyectos WHERE id=$1`, [proyecto_id])
     if (!proy.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
+
+    // Renombrar el archivo para la Base de Datos preservando su extensión real
+    const ext = imagen_tipo ? imagen_tipo.split('/')[1] : "jpg";
+    const secureFileName = `Evidencia_${Date.now()}_${Math.round(Math.random()*1000)}.${ext}`;
+
+    let datosAInsertar = imagen_base64;
+
+    // Condicional: si existe la carpeta, guardar en archivo local
+    if (fs.existsSync(UPLOAD_DIR)) {
+      try {
+        const filePath = path.join(UPLOAD_DIR, secureFileName);
+        
+        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        
+        datosAInsertar = `LOCAL_FILE:${secureFileName}`;
+      } catch (err) {
+        console.error("Error guardando archivo en carpeta, fallback a BD:", err);
+      }
+    }
 
     const r = await pool.query(`
       INSERT INTO cip_evidencias (
@@ -49,7 +86,7 @@ exports.subir = async (req, res) => {
       titulo        || null,
       descripcion   || null,
       seccion       || "general",
-      imagen_base64,
+      datosAInsertar,
       imagen_nombre || null,
       imagen_tipo   || null,
       bytesAprox,
@@ -96,7 +133,19 @@ exports.obtener = async (req, res) => {
     `, [req.params.eid])
 
     if (!r.rows[0]) return res.status(404).json({ error: "Evidencia no encontrada" })
-    res.json(r.rows[0])
+    
+    const ev = r.rows[0];
+    if (ev.imagen_base64 && ev.imagen_base64.startsWith("LOCAL_FILE:")) {
+      const fileName = ev.imagen_base64.split(":")[1];
+      const filePath = path.join(UPLOAD_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath);
+        const mime = ev.imagen_tipo || "image/jpeg";
+        ev.imagen_base64 = `data:${mime};base64,${fileBuffer.toString('base64')}`;
+      }
+    }
+
+    res.json(ev)
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
@@ -121,6 +170,15 @@ exports.actualizar = async (req, res) => {
 
 exports.eliminar = async (req, res) => {
   try {
+    const r = await pool.query(`SELECT imagen_base64 FROM cip_evidencias WHERE id=$1`, [req.params.eid])
+    if (r.rows[0] && r.rows[0].imagen_base64 && r.rows[0].imagen_base64.startsWith("LOCAL_FILE:")) {
+      const fileName = r.rows[0].imagen_base64.split(":")[1];
+      const filePath = path.join(UPLOAD_DIR, fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
     await pool.query(`DELETE FROM cip_evidencias WHERE id=$1`, [req.params.eid])
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: e.message }) }
