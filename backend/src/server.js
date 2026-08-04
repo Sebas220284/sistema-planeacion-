@@ -25,6 +25,8 @@ const odsRoutes = require("./interfaces/http/routes/odsRoutes")
 const chatRoutes = require("./interfaces/http/routes/chatRoutes")
 const lineasSolRoutes = require("./interfaces/http/routes/lineasSolicitudesRoutes")
 const ponderacionRoutes = require("./interfaces/http/routes/ponderacionRoutes")
+const poblacionRoutes = require("./interfaces/http/routes/poblacionRoutes")
+
 const app = express()
 const server = http.createServer(app)
 
@@ -134,7 +136,7 @@ app.use("/api/ods", odsRoutes)
 app.use("/api/chat", chatRoutes)
 app.use("/api/lineas-solicitudes", lineasSolRoutes)
 app.use("/api/ponderacion", ponderacionRoutes)
-
+app.use("/api/poblacion-grupos", poblacionRoutes)
 
 io.on("connection", (socket) => {
 
