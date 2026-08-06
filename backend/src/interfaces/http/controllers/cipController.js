@@ -23,6 +23,12 @@ const limpiar = (body) => {
     const v = limpio[campo]
     limpio[campo] = (v === undefined || v === null) ? false : Boolean(v)
   })
+
+  // Ensure poblacion_data is stringified for pg driver to insert into JSONB column
+  if (limpio.poblacion_data && typeof limpio.poblacion_data !== 'string') {
+    limpio.poblacion_data = JSON.stringify(limpio.poblacion_data);
+  }
+
   return limpio
 }
 
