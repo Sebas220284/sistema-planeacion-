@@ -11,7 +11,7 @@ const limpiar = (body) => {
     "tipo_mantenimiento","tipo_construccion","tipo_equipamiento","tipo_instalacion",
     "doc_expediente_tecnico","doc_viabilidad","doc_analisis_costo",
     "doc_acreditacion_propiedad","doc_peticion_ciudadania","doc_aceptacion_comunidad",
-    "doc_convenio","doc_padron_beneficiarios"
+    "doc_convenio","doc_padron_beneficiarios","tiene_padron_beneficiarios"
   ]
   const limpio = { ...body }
   NUMERICOS.forEach(campo => {
@@ -166,7 +166,7 @@ const CAMPOS_CIP = [
   "tipo_mantenimiento","tipo_construccion","tipo_equipamiento","tipo_instalacion","tipo_otros",
   "doc_expediente_tecnico","doc_viabilidad","doc_analisis_costo","doc_acreditacion_propiedad",
   "doc_peticion_ciudadania","doc_aceptacion_comunidad","doc_convenio",
-  "doc_padron_beneficiarios","doc_otros_especifique",
+  "doc_padron_beneficiarios","tiene_padron_beneficiarios","doc_otros_especifique",
   "origen_antecedentes","situacion_sin_proyecto","situacion_con_proyecto",
   "descripcion_presupuesto","objetivos_beneficios","consideraciones_diagnostico",
   "unidad_medida_poblacion","poblacion_total","poblacion_mujeres","poblacion_hombres",
