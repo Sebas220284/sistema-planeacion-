@@ -5,7 +5,6 @@ class NotificationService {
     try {
       const { user_id, dependency_id, tipo, titulo, mensaje, link } = data;
 
-      // 1. Guardar en base de datos
       const result = await pool.query(
         `INSERT INTO notifications (user_id, dependency_id, tipo, titulo, mensaje, link) 
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -14,7 +13,6 @@ class NotificationService {
 
       const notif = result.rows[0];
 
-      // 2. Emitir por socket
       if (io && rooms) {
         if (Array.isArray(rooms)) {
           rooms.forEach(room => io.to(room).emit('nueva_notificacion', notif));
