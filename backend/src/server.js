@@ -27,6 +27,8 @@ const lineasSolRoutes = require("./interfaces/http/routes/lineasSolicitudesRoute
 const ponderacionRoutes = require("./interfaces/http/routes/ponderacionRoutes")
 const poblacionRoutes = require("./interfaces/http/routes/poblacionRoutes")
 const potRoutes = require("./interfaces/http/routes/potRoutes")
+const coloniasRoutes = require("./interfaces/http/routes/coloniasRoutes")
+
 
 
 const app = express()
@@ -140,7 +142,7 @@ app.use("/api/lineas-solicitudes", lineasSolRoutes)
 app.use("/api/ponderacion", ponderacionRoutes)
 app.use("/api/poblacion-grupos", poblacionRoutes)
 app.use("/api/pot", potRoutes)
-
+app.use("/api/colonias", coloniasRoutes)
 io.on("connection", (socket) => {
 
   socket.on("chat_join", ({ dependency_id, user_id, rol }) => {
