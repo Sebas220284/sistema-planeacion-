@@ -57,7 +57,7 @@ app.use(cors({
       return callback(null, true)
     }
 
-    return callback(new Error("Acceso no autorizado."))
+    return callback(new Error("FATAL ERROR."))
   },
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],
