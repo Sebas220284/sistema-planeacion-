@@ -8,5 +8,8 @@ router.get("/stats",ctrl.getStats)
 router.get("/buscar",ctrl.buscar)     
 router.get("/:numero",ctrl.getUno)      
 router.get("/:numero/metas",ctrl.getMetas)    
+router.get("/planes/pnd",ctrl.getPnd)
+router.get("/planes/ped",ctrl.getPed)
+router.get("/planes/pmd",ctrl.getPmd)
 
 module.exports = router
