@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:16
     container_name: planeacion_postgres
@@ -7,37 +6,30 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: COdeRYlUNCHvKqPAfBLSstqQPUAbNkMs
-      POSTGRES_DB: planeacion_proyectos
-
+      POSTGRES_DB: planeacion_proyetos
     ports:
       - "5432:5432"
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
-  networks: 
+    networks:
       - red_sistema
-      
+
+  backend:
+    build: .
+    container_name: sistema_planeacion_api
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    networks:
+      - red_sistema
 
 volumes:
   postgres_data:
 
-backend:
-  
-build: .
-container_name: sistema_planeacion_api
-restart: always
-ports:
- - "3000:3000"
-environment: 
- DATABASE_URL: postgresql://postgres:nMVPnPCPYYxqTCPCCGAbhIzfRQEeAXwi@tokaido.proxy.rlwy.net:16984/railway
- PORT: 3000
- NODE_ENV: production
- depends_on:
- - postgres_db
- networks:
-  - red_sistema
- volumes: 
-  postgres_data:
 networks:
-red_sistema:
- driver:bridge
+  red_sistema:
+    driver: bridge
