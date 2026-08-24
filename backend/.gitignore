@@ -2,4 +2,3 @@ node_modules/
 .ENV
 tarjet.js
 seedUsers.js
-docker-compose.yml
