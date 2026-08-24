@@ -155,7 +155,7 @@ exports.getStats = async (req, res) => {
 }
 exports.getPnd = async (req, res) => {
   try {
-    const r = await pool.query(
+    const r = await pool.query(`
       SELECT p.*,
         COALESCE(
           json_agg(
@@ -174,7 +174,7 @@ exports.getPnd = async (req, res) => {
       LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
       GROUP BY p.id
       ORDER BY p.id
-    )
+    `)
     res.json(r.rows)
   } catch(e) {
     console.error("Error getPnd:", e)
@@ -184,7 +184,7 @@ exports.getPnd = async (req, res) => {
 
 exports.getPed = async (req, res) => {
   try {
-    const r = await pool.query(
+    const r = await pool.query(`
       SELECT p.*,
         COALESCE(
           json_agg(
@@ -203,7 +203,7 @@ exports.getPed = async (req, res) => {
       LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
       GROUP BY p.id
       ORDER BY p.id
-    )
+    `)
     res.json(r.rows)
   } catch(e) {
     console.error("Error getPed:", e)
@@ -213,7 +213,7 @@ exports.getPed = async (req, res) => {
 
 exports.getPmd = async (req, res) => {
   try {
-    const r = await pool.query(
+    const r = await pool.query(`
       SELECT p.*,
         COALESCE(
           json_agg(
@@ -232,7 +232,7 @@ exports.getPmd = async (req, res) => {
       LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
       GROUP BY p.id
       ORDER BY p.id
-    )
+    `)
     res.json(r.rows)
   } catch(e) {
     console.error("Error getPmd:", e)
