@@ -4,8 +4,13 @@ const path = require("path")
 
 const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
 
-// Directorio donde se guardarán las fotos si la carpeta existe
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "evidencias");
+// Directorio donde se guardarán las fotos
+const UPLOAD_DIR = path.join(process.cwd(), "home", "evidencias");
+
+// Asegurar que la carpeta exista al arrancar el servidor
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 exports.subir = async (req, res) => {
   try {
