@@ -1,11 +1,12 @@
 const pool = require("../../../database/postgres")
 const fs = require("fs")
 const path = require("path")
+const os = require("os")
 
 const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
 
-// Directorio donde se guardarán las fotos
-const UPLOAD_DIR = "/home/evidencias";
+//DIR
+const UPLOAD_DIR = "/var/lib/system-pla/evidencias";
 
 // Asegurar que la carpeta exista al arrancar el servidor
 if (!fs.existsSync(UPLOAD_DIR)) {
