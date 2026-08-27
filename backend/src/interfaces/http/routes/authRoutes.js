@@ -7,9 +7,9 @@ const rateLimit = require("express-rate-limit")
 
 // 2. Escudo Anti-Fuerza Bruta para el Login
 const loginLimiter = rateLimit({
-  windowMs: 2 * 60 * 1000, // 15 minutos
-  max: 10, // Maximo 10 intentos por IP
-  message: { error: "Demasiados intentos de inicio de sesión. Por favor intente nuevamente en 15 minutos." },
+  windowMs: 5 * 60 * 1000, // t
+  max: 5,
+  message: { error: "Demasiados intentos. Por favor intentar mas tarde" },
   standardHeaders: true,
   legacyHeaders: false,
 })
