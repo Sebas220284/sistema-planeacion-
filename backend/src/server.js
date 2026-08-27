@@ -32,6 +32,9 @@ const semaforoRoutes = require("./interfaces/http/routes/semaforoRoutes")
 
 
 const app = express()
+
+app.set('trust proxy', 1)
+
 const server = http.createServer(app)
 
 const io = new Server(server,{
@@ -123,7 +126,6 @@ const authMiddleware = require("./interfaces/http/middlewares/authMiddleware")
 
 app.use("/api/auth",authRoutes)
 
-// Proteger todas las demas rutas
 app.use("/api", authMiddleware)
 
 app.use("/api/trimestres",trimestresRoutes)
