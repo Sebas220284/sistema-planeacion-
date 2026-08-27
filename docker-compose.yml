@@ -21,7 +21,7 @@ services:
     env_file:
       - .env
     volumes:
-      - /var/lib/system-pla/evidencia:/app/uploads/evidencias
+      - /var/lib/system-pla/evidencias:/app/uploads/evidencias
     depends_on:
       - postgres
     networks:
