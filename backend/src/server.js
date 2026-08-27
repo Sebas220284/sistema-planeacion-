@@ -119,7 +119,13 @@ app.get("/",(req,res)=>{
 
 })
 
+const authMiddleware = require("./interfaces/http/middlewares/authMiddleware")
+
 app.use("/api/auth",authRoutes)
+
+// Proteger todas las demas rutas
+app.use("/api", authMiddleware)
+
 app.use("/api/trimestres",trimestresRoutes)
 app.use("/api/planeacion",planeacionRoutes)
 app.use("/api/review",planeacionReviewRoutes)

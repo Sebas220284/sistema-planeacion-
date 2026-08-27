@@ -23,15 +23,16 @@ class LoginUser {
     }
 
     const token = jwt.sign(
-{
-id: user.id,
-email: user.email
-},
-process.env.JWT_SECRET || "secret",
-{
-expiresIn:"8h"
-}
-)
+      {
+        id: user.id,
+        email: user.email,
+        rol: user.role
+      },
+      process.env.JWT_SECRET || "secret",
+      {
+        expiresIn:"8h"
+      }
+    )
     return token
   }
 }
