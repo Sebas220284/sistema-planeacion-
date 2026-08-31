@@ -24,14 +24,14 @@ return result.rows[0]
 }
 
 async findByEmail(email) {
-
-const result = await pool.query(
-'SELECT * FROM public.users WHERE email = $1',
-[email]
-)
-
-return result.rows[0]
-
+  const result = await pool.query(
+    `SELECT u.*, r.name as role 
+     FROM public.users u 
+     LEFT JOIN public.roles r ON u.role_id = r.id 
+     WHERE u.email = $1`,
+    [email]
+  )
+  return result.rows[0]
 }
 
 async findById(id) {

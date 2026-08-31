@@ -32,6 +32,9 @@ const semaforoRoutes = require("./interfaces/http/routes/semaforoRoutes")
 const mppRoutes= require("./interfaces/http/routes/mppRoutes")
 
 const app = express()
+
+app.set('trust proxy', 1)
+
 const server = http.createServer(app)
 
 const io = new Server(server,{
@@ -119,7 +122,12 @@ app.get("/",(req,res)=>{
 
 })
 
+const authMiddleware = require("./interfaces/http/middlewares/authMiddleware")
+
 app.use("/api/auth",authRoutes)
+
+app.use("/api", authMiddleware)
+
 app.use("/api/trimestres",trimestresRoutes)
 app.use("/api/planeacion",planeacionRoutes)
 app.use("/api/review",planeacionReviewRoutes)

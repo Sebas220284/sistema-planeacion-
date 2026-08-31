@@ -153,3 +153,89 @@ exports.getStats = async (req, res) => {
     res.json(stats.rows[0])
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
+exports.getPnd = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT p.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', o.id,
+              'codigo', o.codigo,
+              'nombre', o.nombre,
+              'color_hex', o.color_hex,
+              'icono_emoji', o.icono_emoji
+            )
+          ) FILTER (WHERE o.id IS NOT NULL),
+          '[]'
+        ) AS ods_alineados
+      FROM pnd_ejes p
+      LEFT JOIN pnd_ejes_ods rel ON p.id = rel.pnd_eje_id
+      LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
+      GROUP BY p.id
+      ORDER BY p.id
+    `)
+    res.json(r.rows)
+  } catch(e) {
+    console.error("Error getPnd:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.getPed = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT p.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', o.id,
+              'codigo', o.codigo,
+              'nombre', o.nombre,
+              'color_hex', o.color_hex,
+              'icono_emoji', o.icono_emoji
+            )
+          ) FILTER (WHERE o.id IS NOT NULL),
+          '[]'
+        ) AS ods_alineados
+      FROM ped_ejes p
+      LEFT JOIN ped_ejes_ods rel ON p.id = rel.ped_eje_id
+      LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
+      GROUP BY p.id
+      ORDER BY p.id
+    `)
+    res.json(r.rows)
+  } catch(e) {
+    console.error("Error getPed:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+exports.getPmd = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT p.*,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'id', o.id,
+              'codigo', o.codigo,
+              'nombre', o.nombre,
+              'color_hex', o.color_hex,
+              'icono_emoji', o.icono_emoji
+            )
+          ) FILTER (WHERE o.id IS NOT NULL),
+          '[]'
+        ) AS ods_alineados
+      FROM pmd_ejes p
+      LEFT JOIN pmd_ejes_ods rel ON p.id = rel.pmd_eje_id
+      LEFT JOIN ods_objetivos o ON rel.ods_id = o.id
+      GROUP BY p.id
+      ORDER BY p.id
+    `)
+    res.json(r.rows)
+  } catch(e) {
+    console.error("Error getPmd:", e)
+    res.status(500).json({ error: e.message })
+  }
+}

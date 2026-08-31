@@ -1,11 +1,17 @@
 const pool = require("../../../database/postgres")
 const fs = require("fs")
 const path = require("path")
+const os = require("os")
 
 const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
 
-// Directorio donde se guardarán las fotos si la carpeta existe
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "evidencias");
+// Directorio DENTRO del contenedor de Docker
+const UPLOAD_DIR = "/app/uploads/evidencias";
+
+// Asegurar que la carpeta exista al arrancar el servidor
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 exports.subir = async (req, res) => {
   try {
