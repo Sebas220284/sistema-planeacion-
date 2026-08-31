@@ -29,7 +29,7 @@ const poblacionRoutes = require("./interfaces/http/routes/poblacionRoutes")
 const potRoutes = require("./interfaces/http/routes/potRoutes")
 const coloniasRoutes = require("./interfaces/http/routes/coloniasRoutes")
 const semaforoRoutes = require("./interfaces/http/routes/semaforoRoutes")
-
+const mppRoutes= require("./interfaces/http/routes/mppRoutes")
 
 const app = express()
 const server = http.createServer(app)
@@ -144,6 +144,7 @@ app.use("/api/poblacion-grupos", poblacionRoutes)
 app.use("/api/pot", potRoutes)
 app.use("/api/colonias", coloniasRoutes)
 app.use("/api/semaforo", semaforoRoutes)
+app.use("/api/mpp",mppRoutes)
 
 io.on("connection", (socket) => {
 
