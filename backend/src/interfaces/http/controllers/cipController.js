@@ -539,7 +539,7 @@ exports.togglePDF = async (req, res) => {
       UPDATE cip_proyectos
       SET pdf_habilitado=$1,
           pdf_habilitado_at = CASE WHEN $1 THEN NOW() ELSE NULL END,
-          pdf_habilitado_por = CASE WHEN $1 THEN $2 ELSE NULL END,
+          pdf_habilitado_por = CASE WHEN $1 THEN $2::uuid ELSE NULL END,
           updated_at=NOW()
       WHERE id=$3 RETURNING *
     `, [habilitar, habilitado_por||null, id])
