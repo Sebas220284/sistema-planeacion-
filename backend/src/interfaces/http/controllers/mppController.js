@@ -1,4 +1,3 @@
-// interfaces/http/controllers/mppController.js
 const pool = require("../../../database/postgres")
 
 const FORMATO_TABLA = {
