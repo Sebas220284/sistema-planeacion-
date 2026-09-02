@@ -178,6 +178,18 @@ const CAMPOS_CIP = [
 
 exports.listar = async (req, res) => {
   try {
+    const userId = req.user?.id;
+    let filtroDependencias = "";
+    let params = [];
+
+    if (userId) {
+      const userCheck = await pool.query(`SELECT acceso_restringido FROM users WHERE id=$1`, [userId]);
+      if (userCheck.rows[0]?.acceso_restringido) {
+        filtroDependencias = `JOIN user_dependencias_asignadas uda ON uda.dependency_id = p.dependency_id AND uda.user_id = $1`;
+        params = [userId];
+      }
+    }
+
     const r = await pool.query(`
       SELECT p.*, d.name AS dependencia_nombre,
         u.name AS creado_por_nombre,
@@ -186,6 +198,7 @@ exports.listar = async (req, res) => {
         COUNT(DISTINCT f.id)  AS total_fotos,
         COALESCE(SUM(dp.importe_con_iva), 0) AS presupuesto_calculado
       FROM cip_proyectos p
+      ${filtroDependencias}
       LEFT JOIN dependencies d   ON d.id   = p.dependency_id
       LEFT JOIN users u           ON u.id   = p.creado_por
       LEFT JOIN cat_programas cp  ON cp.clave = p.clave_programa
@@ -194,7 +207,7 @@ exports.listar = async (req, res) => {
       LEFT JOIN cip_desglose_presupuesto dp ON dp.proyecto_id = p.id
       GROUP BY p.id, d.name, u.name, cp.descripcion
       ORDER BY p.created_at DESC
-    `)
+    `, params)
     res.json(r.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
