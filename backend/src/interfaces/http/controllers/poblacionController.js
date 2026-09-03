@@ -3,7 +3,7 @@ const pool = require("../../../database/postgres")
 exports.getTodos = async (req, res) => {
   try {
     const grupos = await pool.query(`
-      SELECT id, nombre, icono, color_hex, orden
+      SELECT id, nombre, color_hex, orden
       FROM cip_grupos_poblacionales
       ORDER BY orden
     `)
