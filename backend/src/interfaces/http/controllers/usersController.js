@@ -5,7 +5,7 @@ exports.listar = async (req, res) => {
   try {
     const r = await pool.query(`
       SELECT u.id, u.name, u.email, u.role_id, u.dependency_id, u.acceso_restringido, 
-        u.dependency_position, u.dependency_role, u.created_at,
+        u.dependency_position, u.dependency_role, u.created_at, u.permisos_menu,
         r.name as rol_nombre, r.description as rol_descripcion, r.level as rol_nivel,
         d.name as dependencia_nombre
       FROM users u
@@ -20,7 +20,7 @@ exports.listar = async (req, res) => {
 exports.obtener = async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT u.id, u.name, u.email, u.role_id, u.dependency_id,
+      SELECT u.id, u.name, u.email, u.role_id, u.dependency_id, u.permisos_menu,
         u.dependency_position, u.dependency_role,
         r.name as rol_nombre, d.name as dependencia_nombre
       FROM users u
@@ -42,7 +42,7 @@ exports.getRoles = async (req, res) => {
 
 exports.crear = async (req, res) => {
   try {
-    const { name, email, password, role_id, dependency_id, dependency_position, dependency_role } = req.body
+    const { name, email, password, role_id, dependency_id, dependency_position, dependency_role, permisos_menu } = req.body
 
     if (!name || !email || !password || !role_id) {
       return res.status(400).json({ error: "Nombre, correo, contraseña y rol son obligatorios" })
@@ -57,14 +57,17 @@ exports.crear = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10)
+    
+    // Default fallback to ensure backwards compatibility if not provided
+    const menuPerms = permisos_menu ? JSON.stringify(permisos_menu) : '["cip", "arboles", "estrategias", "notificaciones_dep"]';
 
     const r = await pool.query(`
-      INSERT INTO users (name, email, password_hash, role_id, dependency_id, dependency_position, dependency_role)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      RETURNING id, name, email, role_id, dependency_id, dependency_position, dependency_role, created_at
+      INSERT INTO users (name, email, password_hash, role_id, dependency_id, dependency_position, dependency_role, permisos_menu)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      RETURNING id, name, email, role_id, dependency_id, dependency_position, dependency_role, permisos_menu, created_at
     `, [
       name, email, passwordHash, role_id,
-      dependency_id || null, dependency_position || null, dependency_role || null
+      dependency_id || null, dependency_position || null, dependency_role || null, menuPerms
     ])
 
     res.json(r.rows[0])
@@ -76,7 +79,7 @@ exports.crear = async (req, res) => {
 
 exports.actualizar = async (req, res) => {
   try {
-    const { name, email, role_id, dependency_id, dependency_position, dependency_role } = req.body
+    const { name, email, role_id, dependency_id, dependency_position, dependency_role, permisos_menu } = req.body
 
     if (!name || !email || !role_id) {
       return res.status(400).json({ error: "Nombre, correo y rol son obligatorios" })
@@ -86,15 +89,17 @@ exports.actualizar = async (req, res) => {
     if (existe.rows.length > 0) {
       return res.status(400).json({ error: "Ese correo ya está en uso por otro usuario" })
     }
+    
+    const menuPerms = permisos_menu ? JSON.stringify(permisos_menu) : '["cip", "arboles", "estrategias", "notificaciones_dep"]';
 
     const r = await pool.query(`
       UPDATE users SET name=$1, email=$2, role_id=$3,
-        dependency_id=$4, dependency_position=$5, dependency_role=$6
-      WHERE id=$7
-      RETURNING id, name, email, role_id, dependency_id, dependency_position, dependency_role
+        dependency_id=$4, dependency_position=$5, dependency_role=$6, permisos_menu=$7
+      WHERE id=$8
+      RETURNING id, name, email, role_id, dependency_id, dependency_position, dependency_role, permisos_menu
     `, [
       name, email, role_id,
-      dependency_id || null, dependency_position || null, dependency_role || null,
+      dependency_id || null, dependency_position || null, dependency_role || null, menuPerms,
       req.params.id
     ])
 

@@ -17,6 +17,7 @@ const user = {
   name: rows[0].name,
   email: rows[0].email,
   rol: rows[0].role,
+  permisos_menu: rows[0].permisos_menu,
   dependency_id: rows[0].dependency_id, 
   dependencia: rows[0].dependencia,
   titular: rows[0].titular,

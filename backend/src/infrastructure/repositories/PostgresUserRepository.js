@@ -42,6 +42,7 @@ SELECT
 u.id,
 u.name,
 u.email,
+u.permisos_menu,
 r.name as role,
 
 d.id as dependency_id,
@@ -75,6 +76,7 @@ async findUserWithStrategies(userId){
     u.id,
     u.name,
     u.email,
+    u.permisos_menu,
     r.name as role,
 
     d.id as dependency_id,
