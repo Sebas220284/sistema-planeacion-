@@ -35,8 +35,8 @@ const limpiar = (body) => {
 const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0)
 
 
-// CATÁLOGOS
-// ════════════════════════════════════════════
+// CATÃLOGOS
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 exports.getCatProgramas = async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM cat_programas ORDER BY clave`)
@@ -127,7 +127,7 @@ exports.getPMDPorDependencia = async (req, res) => {
 }
 exports.obtenerParaExportar = async (req, res) => {
   try {
-    const [proyecto, metas, desglose] = await Promise.all([
+    const [proyecto, metas, desglose, calendario] = await Promise.all([
       pool.query(`
         SELECT p.*, d.name AS dependencia_nombre, d.titular, d.enlace,
           cp.descripcion AS programa_desc,
@@ -146,9 +146,21 @@ exports.obtenerParaExportar = async (req, res) => {
       `, [req.params.id]),
       pool.query(`SELECT * FROM cip_metas WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
       pool.query(`SELECT * FROM cip_desglose_presupuesto WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
+      pool.query(`
+        SELECT c.*, d.descripcion as partida_descripcion 
+        FROM cip_calendario c
+        JOIN cip_desglose_presupuesto d ON c.desglose_id = d.id
+        WHERE c.proyecto_id=$1 
+        ORDER BY c.id
+      `, [req.params.id])
     ])
     if (!proyecto.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
-    res.json({ ...proyecto.rows[0], metas: metas.rows, desglose: desglose.rows })
+    res.json({ 
+      ...proyecto.rows[0], 
+      metas: metas.rows, 
+      desglose: desglose.rows,
+      calendario: calendario?.rows || [] 
+    })
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
 
@@ -457,7 +469,7 @@ exports.enviarRevision = async (req, res) => {
       WHERE id=$1 RETURNING *
     `, [id])
 
-    await guardarHistorial(pool, id, estado, "enviado", null, enviado_por_nombre||"Dependencia", "Enviado a revisión de Planeación", null)
+    await guardarHistorial(pool, id, estado, "enviado", null, enviado_por_nombre||"Dependencia", "Enviado a revisiÃ³n de PlaneaciÃ³n", null)
 
     const io = req.app.get("io")
     io.to("planeacion").emit("cip_enviado_revision", {
@@ -571,8 +583,8 @@ exports.togglePDF = async (req, res) => {
     res.json({
       ...r.rows[0],
       mensaje: habilitar
-        ? "✅ PDF habilitado. La dependencia ya puede descargarlo."
-        : "🔒 PDF deshabilitado. La dependencia no puede descargarlo."
+        ? "âœ… PDF habilitado. La dependencia ya puede descargarlo."
+        : "ðŸ”’ PDF deshabilitado. La dependencia no puede descargarlo."
     })
   } catch(e) {
     console.error("Error toggle PDF:", e)

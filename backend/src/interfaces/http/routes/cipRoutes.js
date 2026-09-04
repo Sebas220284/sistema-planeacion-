@@ -2,6 +2,7 @@ const express = require("express")
 const router = express.Router()
 const ctrl = require("../controllers/cipController")
 const evCtrl = require("../controllers/evidenciasController")
+const calCtrl = require("../controllers/calendariosController")
 
 router.get("/catalogos/programas",ctrl.getCatProgramas)
 router.get("/catalogos/subprogramas/:prog",ctrl.getCatSubprogramas)
@@ -25,6 +26,12 @@ router.get("/:id/metas",ctrl.getMetas)
 router.post("/:id/metas",ctrl.agregarMeta)
 router.put("/metas/:mid",ctrl.actualizarMeta)
 router.delete("/metas/:mid",ctrl.eliminarMeta)
+
+router.get("/:id/calendario",calCtrl.getCalendario)
+router.put("/calendario/:cid",calCtrl.actualizarCalendario)
+router.delete("/calendario/:cid",calCtrl.eliminarCalendario)
+router.post("/:id/calendario",calCtrl.agregarCalendario)
+
 router.get("/catalogos/dependencias",ctrl.getDependencias)
 router.get("/:id/exportar",ctrl.obtenerParaExportar)
 
