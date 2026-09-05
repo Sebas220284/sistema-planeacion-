@@ -111,6 +111,24 @@ exports.actualizar = async (req, res) => {
   }
 }
 
+exports.actualizarPermisos = async (req, res) => {
+  try {
+    const { permisos_menu } = req.body;
+    const menuPerms = JSON.stringify(permisos_menu || []);
+
+    const r = await pool.query(`
+      UPDATE users SET permisos_menu=$1 WHERE id=$2
+      RETURNING id, permisos_menu
+    `, [menuPerms, req.params.id]);
+
+    if (!r.rows[0]) return res.status(404).json({ error: "Usuario no encontrado" });
+    res.json({ ok: true, usuario: r.rows[0], mensaje: "Permisos actualizados correctamente" });
+  } catch (e) {
+    console.error("Error actualizando permisos:", e);
+    res.status(500).json({ error: e.message });
+  }
+}
+
 exports.cambiarPassword = async (req, res) => {
   try {
     const { password } = req.body
