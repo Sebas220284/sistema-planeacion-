@@ -24,29 +24,9 @@ const limpiar = (body) => {
     limpio[campo] = (v === undefined || v === null) ? false : Boolean(v)
   })
 
+  // Ensure poblacion_data is stringified for pg driver to insert into JSONB column
   if (limpio.poblacion_data && typeof limpio.poblacion_data !== 'string') {
     limpio.poblacion_data = JSON.stringify(limpio.poblacion_data);
-  }
-
-  if (limpio.pmd_lineas_accion !== undefined && limpio.pmd_lineas_accion !== null) {
-    if (typeof limpio.pmd_lineas_accion === 'string') {
-      try {
-        const parsed = JSON.parse(limpio.pmd_lineas_accion);
-        if (!Array.isArray(parsed)) {
-          limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
-        }
-      } catch (e) {
-        if (limpio.pmd_lineas_accion.trim() === '') {
-          limpio.pmd_lineas_accion = JSON.stringify([]);
-        } else {
-          limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
-        }
-      }
-    } else if (Array.isArray(limpio.pmd_lineas_accion)) {
-      limpio.pmd_lineas_accion = JSON.stringify(limpio.pmd_lineas_accion);
-    } else {
-      limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
-    }
   }
 
   return limpio
@@ -55,7 +35,8 @@ const limpiar = (body) => {
 const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0)
 
 
-
+// CATÁLOGOS
+// ════════════════════════════════════════════
 exports.getCatProgramas = async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM cat_programas ORDER BY clave`)
@@ -146,7 +127,7 @@ exports.getPMDPorDependencia = async (req, res) => {
 }
 exports.obtenerParaExportar = async (req, res) => {
   try {
-    const [proyecto, metas, desglose, calendario] = await Promise.all([
+    const [proyecto, metas, desglose] = await Promise.all([
       pool.query(`
         SELECT p.*, d.name AS dependencia_nombre, d.titular, d.enlace,
           cp.descripcion AS programa_desc,
@@ -165,21 +146,9 @@ exports.obtenerParaExportar = async (req, res) => {
       `, [req.params.id]),
       pool.query(`SELECT * FROM cip_metas WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
       pool.query(`SELECT * FROM cip_desglose_presupuesto WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
-      pool.query(`
-        SELECT c.*, d.descripcion as partida_descripcion 
-        FROM cip_calendario c
-        JOIN cip_desglose_presupuesto d ON c.desglose_id = d.id
-        WHERE c.proyecto_id=$1 
-        ORDER BY c.id
-      `, [req.params.id])
     ])
     if (!proyecto.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
-    res.json({ 
-      ...proyecto.rows[0], 
-      metas: metas.rows, 
-      desglose: desglose.rows,
-      calendario: calendario?.rows || [] 
-    })
+    res.json({ ...proyecto.rows[0], metas: metas.rows, desglose: desglose.rows })
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
 
@@ -201,26 +170,14 @@ const CAMPOS_CIP = [
   "origen_antecedentes","situacion_sin_proyecto","situacion_con_proyecto",
   "descripcion_presupuesto","objetivos_beneficios","consideraciones_diagnostico",
   "unidad_medida_poblacion","poblacion_total","poblacion_mujeres","poblacion_hombres",
-  "tipo_poblacion","poblacion_data","otros_poblacion",
+  "tipo_poblacion","poblacion_data",
   "georef_macro_lat","georef_macro_lng","georef_macro_localidad",
   "georef_micro_lat","georef_micro_lng","georef_micro_localidad",
-  "elaboro_nombre","elaboro_cargo","elaboro_enlace","visto_bueno_nombre","visto_bueno_cargo"
+  "elaboro_nombre","elaboro_cargo","visto_bueno_nombre","visto_bueno_cargo"
 ]
 
 exports.listar = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    let filtroDependencias = "";
-    let params = [];
-
-    if (userId) {
-      const userCheck = await pool.query(`SELECT acceso_restringido FROM users WHERE id=$1`, [userId]);
-      if (userCheck.rows[0]?.acceso_restringido) {
-        filtroDependencias = `JOIN user_dependencias_asignadas uda ON uda.dependency_id = p.dependency_id AND uda.user_id = $1`;
-        params = [userId];
-      }
-    }
-
     const r = await pool.query(`
       SELECT p.*, d.name AS dependencia_nombre,
         u.name AS creado_por_nombre,
@@ -229,7 +186,6 @@ exports.listar = async (req, res) => {
         COUNT(DISTINCT f.id)  AS total_fotos,
         COALESCE(SUM(dp.importe_con_iva), 0) AS presupuesto_calculado
       FROM cip_proyectos p
-      ${filtroDependencias}
       LEFT JOIN dependencies d   ON d.id   = p.dependency_id
       LEFT JOIN users u           ON u.id   = p.creado_por
       LEFT JOIN cat_programas cp  ON cp.clave = p.clave_programa
@@ -238,7 +194,7 @@ exports.listar = async (req, res) => {
       LEFT JOIN cip_desglose_presupuesto dp ON dp.proyecto_id = p.id
       GROUP BY p.id, d.name, u.name, cp.descripcion
       ORDER BY p.created_at DESC
-    `, params)
+    `)
     res.json(r.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
@@ -488,7 +444,7 @@ exports.enviarRevision = async (req, res) => {
       WHERE id=$1 RETURNING *
     `, [id])
 
-    await guardarHistorial(pool, id, estado, "enviado", null, enviado_por_nombre||"Dependencia", "Enviado a revisiÃ³n de PlaneaciÃ³n", null)
+    await guardarHistorial(pool, id, estado, "enviado", null, enviado_por_nombre||"Dependencia", "Enviado a revisión de Planeación", null)
 
     const io = req.app.get("io")
     io.to("planeacion").emit("cip_enviado_revision", {
@@ -602,8 +558,8 @@ exports.togglePDF = async (req, res) => {
     res.json({
       ...r.rows[0],
       mensaje: habilitar
-        ? "âœ… PDF habilitado. La dependencia ya puede descargarlo."
-        : "ðŸ”’ PDF deshabilitado. La dependencia no puede descargarlo."
+        ? "✅ PDF habilitado. La dependencia ya puede descargarlo."
+        : "🔒 PDF deshabilitado. La dependencia no puede descargarlo."
     })
   } catch(e) {
     console.error("Error toggle PDF:", e)
