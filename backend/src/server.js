@@ -30,8 +30,6 @@ const potRoutes = require("./interfaces/http/routes/potRoutes")
 const coloniasRoutes = require("./interfaces/http/routes/coloniasRoutes")
 const semaforoRoutes = require("./interfaces/http/routes/semaforoRoutes")
 const mppRoutes= require("./interfaces/http/routes/mppRoutes")
-const auditRoutes = require("./interfaces/http/routes/auditRoutes")
-const auditCtrl   = require("./interfaces/http/controllers/auditController")
 
 const app = express()
 
