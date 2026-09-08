@@ -24,7 +24,6 @@ const limpiar = (body) => {
     limpio[campo] = (v === undefined || v === null) ? false : Boolean(v)
   })
 
-  // Ensure poblacion_data is stringified for pg driver to insert into JSONB column
   if (limpio.poblacion_data && typeof limpio.poblacion_data !== 'string') {
     limpio.poblacion_data = JSON.stringify(limpio.poblacion_data);
   }
@@ -32,13 +31,11 @@ const limpiar = (body) => {
   if (limpio.pmd_lineas_accion !== undefined && limpio.pmd_lineas_accion !== null) {
     if (typeof limpio.pmd_lineas_accion === 'string') {
       try {
-        // Check if it's already a JSON array string
         const parsed = JSON.parse(limpio.pmd_lineas_accion);
         if (!Array.isArray(parsed)) {
           limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
         }
       } catch (e) {
-        // It's a plain string, wrap it
         if (limpio.pmd_lineas_accion.trim() === '') {
           limpio.pmd_lineas_accion = JSON.stringify([]);
         } else {
@@ -58,8 +55,7 @@ const limpiar = (body) => {
 const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0)
 
 
-// CATÃLOGOS
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+
 exports.getCatProgramas = async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM cat_programas ORDER BY clave`)

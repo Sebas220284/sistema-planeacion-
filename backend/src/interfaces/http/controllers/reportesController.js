@@ -25,7 +25,6 @@ exports.programadoEjecutado = async (req, res) => {
       ORDER BY d.name, pt.lineas_accion, tr.trimestre, tr.tipo
     `, [anio])
 
-    // Reestructura: una fila por línea de acción, con T1..T4 programado/ejecutado
     const mapa = new Map()
 
     for (const row of r.rows) {

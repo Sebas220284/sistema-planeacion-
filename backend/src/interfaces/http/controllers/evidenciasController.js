@@ -3,12 +3,10 @@ const fs = require("fs")
 const path = require("path")
 const os = require("os")
 
-const MAX_BYTES = 2 * 1024 * 1024   // 2 MB
+const MAX_BYTES = 2 * 1024 * 1024  
 
-// Directorio DENTRO del contenedor de Docker
 const UPLOAD_DIR = "/app/uploads/evidencias";
 
-// Asegurar que la carpeta exista al arrancar el servidor
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
@@ -37,11 +35,9 @@ exports.subir = async (req, res) => {
       })
     }
 
-    // Extraer base64 crudo para validarlo y guardarlo
     const base64Data = imagen_base64.replace(/^data:image\/\w+;base64,/, "");
 
-    // Verificación explícita de "Magic Number" (Firma binaria del archivo)
-    // Esto evita que suban un .docx o .exe renombrado a .jpg
+   
     const isJPG = base64Data.startsWith("/9j/");
     const isPNG = base64Data.startsWith("iVBORw0KGgo");
     const isWEBP = base64Data.startsWith("UklGR");
@@ -58,13 +54,11 @@ exports.subir = async (req, res) => {
     const proy = await pool.query(`SELECT id FROM cip_proyectos WHERE id=$1`, [proyecto_id])
     if (!proy.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
 
-    // Renombrar el archivo para la Base de Datos preservando su extensión real
     const ext = imagen_tipo ? imagen_tipo.split('/')[1] : "jpg";
     const secureFileName = `Evidencia_${Date.now()}_${Math.round(Math.random()*1000)}.${ext}`;
 
     let datosAInsertar = imagen_base64;
 
-    // Condicional: si existe la carpeta, guardar en archivo local
     if (fs.existsSync(UPLOAD_DIR)) {
       try {
         const filePath = path.join(UPLOAD_DIR, secureFileName);
