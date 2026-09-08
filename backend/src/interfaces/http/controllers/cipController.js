@@ -29,6 +29,29 @@ const limpiar = (body) => {
     limpio.poblacion_data = JSON.stringify(limpio.poblacion_data);
   }
 
+  if (limpio.pmd_lineas_accion !== undefined && limpio.pmd_lineas_accion !== null) {
+    if (typeof limpio.pmd_lineas_accion === 'string') {
+      try {
+        // Check if it's already a JSON array string
+        const parsed = JSON.parse(limpio.pmd_lineas_accion);
+        if (!Array.isArray(parsed)) {
+          limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
+        }
+      } catch (e) {
+        // It's a plain string, wrap it
+        if (limpio.pmd_lineas_accion.trim() === '') {
+          limpio.pmd_lineas_accion = JSON.stringify([]);
+        } else {
+          limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
+        }
+      }
+    } else if (Array.isArray(limpio.pmd_lineas_accion)) {
+      limpio.pmd_lineas_accion = JSON.stringify(limpio.pmd_lineas_accion);
+    } else {
+      limpio.pmd_lineas_accion = JSON.stringify([limpio.pmd_lineas_accion]);
+    }
+  }
+
   return limpio
 }
 
