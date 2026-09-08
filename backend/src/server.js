@@ -155,8 +155,6 @@ app.use("/api/pot", potRoutes)
 app.use("/api/colonias", coloniasRoutes)
 app.use("/api/semaforo", semaforoRoutes)
 app.use("/api/mpp",mppRoutes)
-app.use("/api/audit", auditRoutes)
-app.locals.registrarAudit = auditCtrl.registrar
 
 io.on("connection", (socket) => {
 
