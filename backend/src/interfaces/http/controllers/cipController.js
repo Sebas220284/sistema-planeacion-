@@ -173,7 +173,7 @@ const CAMPOS_CIP = [
   "tipo_poblacion","poblacion_data",
   "georef_macro_lat","georef_macro_lng","georef_macro_localidad",
   "georef_micro_lat","georef_micro_lng","georef_micro_localidad",
-  "elaboro_nombre","elaboro_cargo","visto_bueno_nombre","visto_bueno_cargo"
+  "elaboro_nombre","elaboro_cargo","elaboro_enlace","visto_bueno_nombre","visto_bueno_cargo"
 ]
 
 exports.listar = async (req, res) => {
