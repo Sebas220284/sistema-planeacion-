@@ -30,6 +30,8 @@ const potRoutes = require("./interfaces/http/routes/potRoutes")
 const coloniasRoutes = require("./interfaces/http/routes/coloniasRoutes")
 const semaforoRoutes = require("./interfaces/http/routes/semaforoRoutes")
 const mppRoutes= require("./interfaces/http/routes/mppRoutes")
+const reportesCIPRoutes = require("./interfaces/http/routes/reportesCIPRoutes")
+
 
 const app = express()
 
@@ -153,6 +155,7 @@ app.use("/api/pot", potRoutes)
 app.use("/api/colonias", coloniasRoutes)
 app.use("/api/semaforo", semaforoRoutes)
 app.use("/api/mpp",mppRoutes)
+app.use("/api/reportes", reportesCIPRoutes)
 
 io.on("connection", (socket) => {
 

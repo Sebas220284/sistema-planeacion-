@@ -25,6 +25,15 @@ return res.status(401).json({error:"Token inválido"})
 }
 
 }
+const ROLES_INVERSION = ["admin", "planeacion", "inversion_publica"]
+
+
+exports.soloInversion = (req, res, next) => {
+  if (!ROLES_INVERSION.includes(req.usuario?.rol_nombre)) {
+    return res.status(403).json({ error: "Acceso denegado" })
+  }
+  next()
+}
 exports.loginTransporte = async (req, res) => {
     const { email, password } = req.body;
     try {
