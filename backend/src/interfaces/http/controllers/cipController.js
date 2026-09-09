@@ -178,7 +178,15 @@ const CAMPOS_CIP = [
 
 exports.listar = async (req, res) => {
   try {
-    const r = await pool.query(`
+    let whereClause = "";
+    const params = [];
+    
+    if (req.user && req.user.rol === 'inversion_publica') {
+      whereClause = "WHERE p.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $1)";
+      params.push(req.user.id);
+    }
+
+    const query = `
       SELECT p.*, d.name AS dependencia_nombre,
         u.name AS creado_por_nombre,
         cp.descripcion AS programa_desc,
@@ -192,9 +200,11 @@ exports.listar = async (req, res) => {
       LEFT JOIN cip_metas m       ON m.proyecto_id = p.id
       LEFT JOIN cip_fotos f       ON f.proyecto_id = p.id
       LEFT JOIN cip_desglose_presupuesto dp ON dp.proyecto_id = p.id
+      ${whereClause}
       GROUP BY p.id, d.name, u.name, cp.descripcion
       ORDER BY p.created_at DESC
-    `)
+    `;
+    const r = await pool.query(query, params);
     res.json(r.rows)
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
