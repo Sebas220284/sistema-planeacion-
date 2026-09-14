@@ -113,3 +113,63 @@ exports.getAnios = async (req, res) => {
     res.json(r.rows.map(x => x.anio))
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
+
+exports.reportePorEje = async (req, res) => {
+  try {
+    const { estado, anio } = req.query
+    let where = "WHERE 1=1"
+    const params = []
+
+    if (req.query.user_id) {
+      const userRes = await pool.query(`
+        SELECT r.name as rol 
+        FROM users u 
+        LEFT JOIN roles r ON u.role_id = r.id 
+        WHERE u.id = $1
+      `, [req.query.user_id]);
+      if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+        params.push(req.query.user_id)
+        where += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`
+      }
+    }
+
+    if (estado) {
+      params.push(estado)
+      where += ` AND c.estado = $${params.length}`
+    }
+    if (anio) {
+      params.push(Number(anio))
+      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+    }
+
+    const r = await pool.query(`
+      SELECT
+        COALESCE(c.pmd_eje, 'Sin Eje Asignado') AS eje,
+        COUNT(c.id)::int                        AS total_proyectos,
+        COALESCE(SUM(c.costo_total), 0)         AS monto_total
+      FROM cip_proyectos c
+      ${where}
+      GROUP BY COALESCE(c.pmd_eje, 'Sin Eje Asignado')
+      ORDER BY SUM(c.costo_total) DESC
+    `, params)
+
+    const totales = await pool.query(`
+      SELECT
+        COUNT(c.id)::int                        AS total_proyectos,
+        COALESCE(SUM(c.costo_total), 0)         AS gran_total
+      FROM cip_proyectos c
+      ${where}
+    `, params)
+
+    res.json({
+      reporte: "Resumen de CIPs por Eje PMD",
+      generado: new Date().toISOString(),
+      filtros: { estado: estado || "todos", anio: anio || "todos" },
+      ejes: r.rows,
+      totales: totales.rows[0]
+    })
+  } catch(e) {
+    console.error("Error reporte Eje CIP:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
