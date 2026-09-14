@@ -144,12 +144,14 @@ exports.reportePorEje = async (req, res) => {
 
     const r = await pool.query(`
       SELECT
-        COALESCE(c.pmd_eje, 'Sin Eje Asignado') AS eje,
+        COALESCE(c.plan_municipal, 'Sin Eje Asignado') AS eje,
+        d.name                                  AS dependencia_nombre,
         COUNT(c.id)::int                        AS total_proyectos,
         COALESCE(SUM(c.costo_total), 0)         AS monto_total
       FROM cip_proyectos c
+      LEFT JOIN dependencies d ON d.id = c.dependency_id
       ${where}
-      GROUP BY COALESCE(c.pmd_eje, 'Sin Eje Asignado')
+      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), d.name
       ORDER BY SUM(c.costo_total) DESC
     `, params)
 
