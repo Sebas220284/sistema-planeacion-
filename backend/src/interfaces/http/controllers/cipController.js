@@ -127,7 +127,7 @@ exports.getPMDPorDependencia = async (req, res) => {
 }
 exports.obtenerParaExportar = async (req, res) => {
   try {
-    const [proyecto, metas, desglose] = await Promise.all([
+    const [proyecto, metas, desglose, calendario] = await Promise.all([
       pool.query(`
         SELECT p.*, d.name AS dependencia_nombre, d.titular, d.enlace,
           cp.descripcion AS programa_desc,
@@ -146,9 +146,16 @@ exports.obtenerParaExportar = async (req, res) => {
       `, [req.params.id]),
       pool.query(`SELECT * FROM cip_metas WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
       pool.query(`SELECT * FROM cip_desglose_presupuesto WHERE proyecto_id=$1 ORDER BY orden`, [req.params.id]),
+      pool.query(`
+        SELECT c.*, d.partida_clave, d.descripcion as partida_descripcion 
+        FROM cip_calendario c
+        JOIN cip_desglose_presupuesto d ON c.desglose_id = d.id
+        WHERE c.proyecto_id=$1 
+        ORDER BY c.id
+      `, [req.params.id])
     ])
     if (!proyecto.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
-    res.json({ ...proyecto.rows[0], metas: metas.rows, desglose: desglose.rows })
+    res.json({ ...proyecto.rows[0], metas: metas.rows, desglose: desglose.rows, calendario: calendario.rows })
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
 
