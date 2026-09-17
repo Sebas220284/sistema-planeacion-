@@ -114,64 +114,75 @@ exports.getAnios = async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
-exports.reportePorEje = async (req, res) => {
-  try {
-    const { estado, anio } = req.query
-    let where = "WHERE 1=1"
-    const params = []
 
-    if (req.query.user_id) {
-      const userRes = await pool.query(`
-        SELECT r.name as rol 
-        FROM users u 
-        LEFT JOIN roles r ON u.role_id = r.id 
-        WHERE u.id = $1
-      `, [req.query.user_id]);
-      if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
-        params.push(req.query.user_id)
-        where += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`
-      }
-    }
+exports.reporte2 = async (req, res) => {
+  try {
+    const { estado, anio, dep_id, agrupado = "false" } = req.query
+
+    let where   = "WHERE costo_total > 0"
+    const params = []
 
     if (estado) {
       params.push(estado)
-      where += ` AND c.estado = $${params.length}`
+      where += ` AND estado = $${params.length}`
     }
     if (anio) {
       params.push(Number(anio))
-      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+      where += ` AND anio = $${params.length}`
+    }
+    if (dep_id) {
+      params.push(dep_id)
+      where += ` AND dependency_id = $${params.length}`
     }
 
-    const r = await pool.query(`
-      SELECT
-        COALESCE(c.plan_municipal, 'Sin Eje Asignado') AS eje,
-        d.name                                  AS dependencia_nombre,
-        COUNT(c.id)::int                        AS total_proyectos,
-        COALESCE(SUM(c.costo_total), 0)         AS monto_total
-      FROM cip_proyectos c
-      LEFT JOIN dependencies d ON d.id = c.dependency_id
+    const detalle = await pool.query(`
+      SELECT *
+      FROM v_reporte_cip_trimestres
       ${where}
-      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), d.name
-      ORDER BY SUM(c.costo_total) DESC
+      ORDER BY dependencia_nombre, nombre_proyecto
     `, params)
+
+    let resumenWhere = "WHERE monto_total > 0"
+    const resumenParams = []
+    if (anio) {
+      resumenParams.push(Number(anio))
+      resumenWhere += ` AND anio = $${resumenParams.length}`
+    }
+    if (dep_id) {
+      resumenParams.push(dep_id)
+      resumenWhere += ` AND dependency_id = $${resumenParams.length}`
+    }
+
+    const resumen = await pool.query(`
+      SELECT *
+      FROM v_reporte_cip_dep_trimestres
+      ${resumenWhere}
+      ORDER BY monto_total DESC
+    `, resumenParams)
 
     const totales = await pool.query(`
       SELECT
-        COUNT(c.id)::int                        AS total_proyectos,
-        COALESCE(SUM(c.costo_total), 0)         AS gran_total
-      FROM cip_proyectos c
+        COUNT(*)::int          AS total_cips,
+        SUM(costo_total)       AS gran_total,
+        SUM(monto_t1)          AS gran_total_t1,
+        SUM(monto_t2)          AS gran_total_t2,
+        SUM(monto_t3)          AS gran_total_t3,
+        SUM(monto_t4)          AS gran_total_t4,
+        COUNT(DISTINCT dependency_id)::int AS total_dependencias
+      FROM v_reporte_cip_trimestres
       ${where}
     `, params)
 
     res.json({
-      reporte: "Resumen de CIPs por Eje PMD",
-      generado: new Date().toISOString(),
-      filtros: { estado: estado || "todos", anio: anio || "todos" },
-      ejes: r.rows,
-      totales: totales.rows[0]
+      reporte:    "CIPs con Montos por Trimestre",
+      generado:   new Date().toISOString(),
+      filtros:    { estado: estado||"todos", anio: anio||"todos", dep_id: dep_id||"todas" },
+      proyectos:  detalle.rows,
+      por_dependencia: resumen.rows,
+      totales:    totales.rows[0]
     })
   } catch(e) {
-    console.error("Error reporte Eje CIP:", e)
+    console.error("Error reporte 2 CIP:", e)
     res.status(500).json({ error: e.message })
   }
 }
