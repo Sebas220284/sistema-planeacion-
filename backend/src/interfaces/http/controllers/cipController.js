@@ -181,10 +181,18 @@ exports.listar = async (req, res) => {
     let whereClause = "";
     const params = [];
     
-    if (req.user && req.user.rol === 'inversion_publica') {
-      whereClause = "WHERE p.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $1)";
-      params.push(req.user.id);
-    }
+    if (req.query.user_id) {
+        const userRes = await pool.query(`
+          SELECT r.name as rol 
+          FROM users u 
+          LEFT JOIN roles r ON u.role_id = r.id 
+          WHERE u.id = $1
+        `, [req.query.user_id]);
+        if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+          whereClause = "WHERE p.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $1)";
+          params.push(req.query.user_id);
+        }
+      }
 
     const query = `
       SELECT p.*, d.name AS dependencia_nombre,

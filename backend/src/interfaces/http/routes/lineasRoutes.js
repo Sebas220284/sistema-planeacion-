@@ -1,8 +1,14 @@
 const express = require("express")
 const router = express.Router()
 const controller = require("../controllers/lineasController")
+const roleMiddleware = require("../middlewares/roleMiddleware")
 
+// Nueva linea propuesta por dependencias (no protegida por admin)
 router.post("/nueva", controller.nueva)
+
+// Rutas de gestin y aprobacin (solo admins)
+router.use(roleMiddleware(["admin", "superadmin"]));
+
 router.get("/pendientes", controller.getPendientes)
 router.put("/aprobar/:id", controller.aprobar)
 router.put("/rechazar/:id", controller.rechazar)
