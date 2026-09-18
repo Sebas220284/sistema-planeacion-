@@ -115,6 +115,48 @@ exports.getAnios = async (req, res) => {
 }
 
 
+exports.reporteLineasAccion = async (req, res) => {
+  try {
+    const { anio } = req.query;
+    const currentAnio = anio || 2026;
+    
+    // We get total lines assigned to each dependency from v_semaforo_lineas
+    // and total lines affected by CIP projects. 
+    // And also we get the total CIP projects per dependency for the second bar if needed, 
+    // but the user asked for:
+    // Bar 1: lineas de accion totales (por dependencia)
+    // Bar 2: lineas de accion afectadas por proyecto CIP
+    const query = `
+      SELECT 
+          d.name AS dependencia_nombre,
+          COUNT(DISTINCT v.linea_id)::int AS total_lineas,
+          COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN v.linea_id END)::int AS lineas_afectadas,
+          COUNT(DISTINCT c.id)::int AS total_proyectos
+      FROM dependencies d
+      LEFT JOIN v_semaforo_lineas v ON v.dependency_id = d.id AND v.anio = $1
+      LEFT JOIN cip_proyectos c ON c.dependency_id = d.id 
+          AND c.anio = $1
+          AND c.estado != 'rechazado'
+          AND v.lineas_accion = ANY(
+              SELECT jsonb_array_elements_text(
+                  CASE WHEN jsonb_typeof(c.pmd_lineas_accion::jsonb) = 'array' 
+                       THEN c.pmd_lineas_accion::jsonb 
+                       ELSE '[]'::jsonb 
+                  END
+              )
+          )
+      GROUP BY d.name
+      HAVING COUNT(DISTINCT v.linea_id) > 0 OR COUNT(DISTINCT c.id) > 0
+      ORDER BY total_lineas DESC;
+    `;
+    const r = await pool.query(query, [Number(currentAnio)]);
+    res.json(r.rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+};
+
 exports.reporte2 = async (req, res) => {
   try {
     const { estado, anio, dep_id, agrupado = "false" } = req.query
