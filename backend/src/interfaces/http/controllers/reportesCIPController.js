@@ -136,7 +136,7 @@ exports.reporteLineasAccion = async (req, res) => {
       LEFT JOIN (
           SELECT dependency_id, COUNT(id) AS total_lineas
           FROM planning_templates
-          WHERE ejercicio = $1
+          WHERE ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
           GROUP BY dependency_id
       ) pt_agg ON pt_agg.dependency_id = d.id
       LEFT JOIN (
