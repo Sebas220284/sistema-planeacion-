@@ -115,6 +115,47 @@ exports.getAnios = async (req, res) => {
 }
 
 
+exports.reporteLineasAccion = async (req, res) => {
+  try {
+    const { anio, estado } = req.query;
+    const currentAnio = anio || 2026;
+    
+    let estadoCondition = "c.estado != 'rechazado'";
+    const params = [Number(currentAnio)];
+    if (estado && estado !== 'todos') {
+      params.push(estado);
+      estadoCondition = "c.estado = $2";
+    }
+
+    const query = `
+      SELECT 
+          d.name AS dependencia_nombre,
+          COALESCE(pt_agg.total_lineas, 0)::int AS total_lineas,
+          COALESCE(c_agg.total_proyectos, 0)::int AS total_proyectos
+      FROM dependencies d
+      LEFT JOIN (
+          SELECT dependency_id, COUNT(id) AS total_lineas
+          FROM planning_templates
+          WHERE ejercicio = $1
+          GROUP BY dependency_id
+      ) pt_agg ON pt_agg.dependency_id = d.id
+      LEFT JOIN (
+          SELECT dependency_id, COUNT(id) AS total_proyectos
+          FROM cip_proyectos c
+          WHERE c.anio = $1 AND ${estadoCondition}
+          GROUP BY dependency_id
+      ) c_agg ON c_agg.dependency_id = d.id
+      WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
+      ORDER BY pt_agg.total_lineas DESC NULLS LAST;
+    `;
+    const r = await pool.query(query, params);
+    res.json(r.rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+};
+
 exports.reporte2 = async (req, res) => {
   try {
     const { estado, anio, dep_id, agrupado = "false" } = req.query
@@ -183,6 +224,68 @@ exports.reporte2 = async (req, res) => {
     })
   } catch(e) {
     console.error("Error reporte 2 CIP:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+exports.reportePorEje = async (req, res) => {
+  try {
+    const { estado, anio } = req.query
+    let where = "WHERE 1=1"
+    const params = []
+    const pool = require("../../../database/postgres") // Ensure pool is accessible
+
+    if (req.query.user_id) {
+      const userRes = await pool.query(`
+        SELECT r.name as rol 
+        FROM users u 
+        LEFT JOIN roles r ON u.role_id = r.id 
+        WHERE u.id = $1
+      `, [req.query.user_id]);
+      if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+        params.push(req.query.user_id)
+        where += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`
+      }
+    }
+
+    if (estado) {
+      params.push(estado)
+      where += ` AND c.estado = $${params.length}`
+    }
+    if (anio) {
+      params.push(Number(anio))
+      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+    }
+
+    const r = await pool.query(`
+      SELECT
+        COALESCE(c.plan_municipal, 'Sin Eje Asignado') AS eje,
+        d.name                                  AS dependencia_nombre,
+        COUNT(c.id)::int                        AS total_proyectos,
+        COALESCE(SUM(c.costo_total), 0)         AS monto_total
+      FROM cip_proyectos c
+      LEFT JOIN dependencies d ON d.id = c.dependency_id
+      ${where}
+      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), d.name
+      ORDER BY SUM(c.costo_total) DESC
+    `, params)
+
+    const totales = await pool.query(`
+      SELECT
+        COUNT(c.id)::int                        AS total_proyectos,
+        COALESCE(SUM(c.costo_total), 0)         AS gran_total
+      FROM cip_proyectos c
+      ${where}
+    `, params)
+
+    res.json({
+      reporte: "Resumen de CIPs por Eje PMD",
+      generado: new Date().toISOString(),
+      filtros: { estado: estado || "todos", anio: anio || "todos" },
+      ejes: r.rows,
+      totales: totales.rows[0]
+    })
+  } catch(e) {
+    console.error("Error reporte Eje CIP:", e)
     res.status(500).json({ error: e.message })
   }
 }
