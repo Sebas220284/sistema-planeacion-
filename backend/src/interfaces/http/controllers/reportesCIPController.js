@@ -129,15 +129,15 @@ exports.reporteLineasAccion = async (req, res) => {
     const query = `
       SELECT 
           d.name AS dependencia_nombre,
-          COUNT(DISTINCT v.linea_id)::int AS total_lineas,
-          COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN v.linea_id END)::int AS lineas_afectadas,
+          COUNT(DISTINCT pt.id)::int AS total_lineas,
+          COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN pt.id END)::int AS lineas_afectadas,
           COUNT(DISTINCT c.id)::int AS total_proyectos
       FROM dependencies d
-      LEFT JOIN v_semaforo_lineas v ON v.dependency_id = d.id AND v.anio = $1
+      LEFT JOIN planning_templates pt ON pt.dependency_id = d.id AND pt.ejercicio = $1
       LEFT JOIN cip_proyectos c ON c.dependency_id = d.id 
           AND c.anio = $1
           AND c.estado != 'rechazado'
-          AND v.lineas_accion = ANY(
+          AND pt.lineas_accion = ANY(
               SELECT jsonb_array_elements_text(
                   CASE WHEN jsonb_typeof(c.pmd_lineas_accion::jsonb) = 'array' 
                        THEN c.pmd_lineas_accion::jsonb 
@@ -146,7 +146,7 @@ exports.reporteLineasAccion = async (req, res) => {
               )
           )
       GROUP BY d.name
-      HAVING COUNT(DISTINCT v.linea_id) > 0 OR COUNT(DISTINCT c.id) > 0
+      HAVING COUNT(DISTINCT pt.id) > 0 OR COUNT(DISTINCT c.id) > 0
       ORDER BY total_lineas DESC;
     `;
     const r = await pool.query(query, [Number(currentAnio)]);
