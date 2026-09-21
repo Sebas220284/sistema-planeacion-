@@ -117,39 +117,38 @@ exports.getAnios = async (req, res) => {
 
 exports.reporteLineasAccion = async (req, res) => {
   try {
-    const { anio } = req.query;
+    const { anio, estado } = req.query;
     const currentAnio = anio || 2026;
     
-    // We get total lines assigned to each dependency from v_semaforo_lineas
-    // and total lines affected by CIP projects. 
-    // And also we get the total CIP projects per dependency for the second bar if needed, 
-    // but the user asked for:
-    // Bar 1: lineas de accion totales (por dependencia)
-    // Bar 2: lineas de accion afectadas por proyecto CIP
+    let estadoCondition = "c.estado != 'rechazado'";
+    const params = [Number(currentAnio)];
+    if (estado && estado !== 'todos') {
+      params.push(estado);
+      estadoCondition = "c.estado = $2";
+    }
+
     const query = `
       SELECT 
           d.name AS dependencia_nombre,
-          COUNT(DISTINCT pt.id)::int AS total_lineas,
-          COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN pt.id END)::int AS lineas_afectadas,
-          COUNT(DISTINCT c.id)::int AS total_proyectos
+          COALESCE(pt_agg.total_lineas, 0)::int AS total_lineas,
+          COALESCE(c_agg.total_proyectos, 0)::int AS total_proyectos
       FROM dependencies d
-      LEFT JOIN planning_templates pt ON pt.dependency_id = d.id AND pt.ejercicio = $1
-      LEFT JOIN cip_proyectos c ON c.dependency_id = d.id 
-          AND c.anio = $1
-          AND c.estado != 'rechazado'
-          AND pt.lineas_accion = ANY(
-              SELECT jsonb_array_elements_text(
-                  CASE WHEN jsonb_typeof(c.pmd_lineas_accion::jsonb) = 'array' 
-                       THEN c.pmd_lineas_accion::jsonb 
-                       ELSE '[]'::jsonb 
-                  END
-              )
-          )
-      GROUP BY d.name
-      HAVING COUNT(DISTINCT pt.id) > 0 OR COUNT(DISTINCT c.id) > 0
-      ORDER BY total_lineas DESC;
+      LEFT JOIN (
+          SELECT dependency_id, COUNT(id) AS total_lineas
+          FROM planning_templates
+          WHERE ejercicio = $1
+          GROUP BY dependency_id
+      ) pt_agg ON pt_agg.dependency_id = d.id
+      LEFT JOIN (
+          SELECT dependency_id, COUNT(id) AS total_proyectos
+          FROM cip_proyectos c
+          WHERE c.anio = $1 AND ${estadoCondition}
+          GROUP BY dependency_id
+      ) c_agg ON c_agg.dependency_id = d.id
+      WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
+      ORDER BY pt_agg.total_lineas DESC NULLS LAST;
     `;
-    const r = await pool.query(query, [Number(currentAnio)]);
+    const r = await pool.query(query, params);
     res.json(r.rows);
   } catch (e) {
     console.error(e);
