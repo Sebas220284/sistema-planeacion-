@@ -32,7 +32,7 @@ exports.reporte1 = async (req, res) => {
     }
     if (anio) {
       params.push(Number(anio))
-      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+      where += ` AND c.anio = $${params.length}`
     }
 
     const r = await pool.query(`
@@ -59,7 +59,7 @@ exports.reporte1 = async (req, res) => {
         COUNT(c.id) FILTER
           (WHERE c.pdf_habilitado=TRUE)::int AS con_pdf,
         MAX(c.created_at)                   AS ultima_cip,
-        EXTRACT(YEAR FROM MAX(c.created_at))::int AS anio
+        MAX(c.anio)::int AS anio
       FROM dependencies d
       INNER JOIN cip_proyectos c ON c.dependency_id = d.id
       ${where}
@@ -118,13 +118,18 @@ exports.getAnios = async (req, res) => {
 exports.reporteLineasAccion = async (req, res) => {
   try {
     const { anio, estado } = req.query;
-    const currentAnio = anio || 2026;
     
-    let estadoCondition = "c.estado != 'rechazado'";
-    const params = [Number(currentAnio)];
+    let cipWhere = "c.estado != 'rechazado'";
+    const params = [];
+    
     if (estado && estado !== 'todos') {
       params.push(estado);
-      estadoCondition = "c.estado = $2";
+      cipWhere += ` AND c.estado = $${params.length}`;
+    }
+    
+    if (anio && anio !== 'todos') {
+      params.push(Number(anio));
+      cipWhere += ` AND c.anio = $${params.length}`;
     }
 
     const query = `
@@ -142,7 +147,7 @@ exports.reporteLineasAccion = async (req, res) => {
       LEFT JOIN (
           SELECT dependency_id, COUNT(id) AS total_proyectos
           FROM cip_proyectos c
-          WHERE c.anio = $1 AND ${estadoCondition}
+          WHERE ${cipWhere}
           GROUP BY dependency_id
       ) c_agg ON c_agg.dependency_id = d.id
       WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
@@ -253,7 +258,7 @@ exports.reportePorEje = async (req, res) => {
     }
     if (anio) {
       params.push(Number(anio))
-      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+      where += ` AND c.anio = $${params.length}`
     }
 
     const r = await pool.query(`
