@@ -42,6 +42,7 @@ rows.forEach(r => {
       total: r.total,
       ejercicio: r.ejercicio,
       columna1: r.columna1,
+        activa: r.activa,
       lineas_accion: r.lineas_accion,
       nomenclatura: r.nomenclatura,
       nombre2: r.nombre2,

@@ -88,7 +88,8 @@ async findUserWithStrategies(userId){
     s.name as strategy_name,
     s.description,
 
-    p.id as linea_id,       
+    p.id as linea_id,
+    p.activa,       
     p.pmd_eje,
     p.pmd_tema,
     p.pmd_politica_publica,
@@ -130,3 +131,4 @@ async findUserWithStrategies(userId){
 }
 
 module.exports = PostgresUserRepository
+

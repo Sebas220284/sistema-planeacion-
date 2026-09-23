@@ -195,3 +195,15 @@ exports.actualizarTexto = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+
+exports.toggleActiva = async (req, res) => {
+  try {
+    const { activa } = req.body;
+    await pool.query('UPDATE planning_templates SET activa =  WHERE id = ', [activa, req.params.id]);
+    res.json({ message: 'Estado de la línea actualizado' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al cambiar el estado de la línea' });
+  }
+};
+

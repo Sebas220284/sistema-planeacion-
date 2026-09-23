@@ -34,7 +34,7 @@ exports.dashboard = async (req, res) => {
     for (const dep of dependencias) {
       const estrategiasResult = await pool.query(`
         SELECT s.*, json_agg(
-          json_build_object('id', pt.id, 'lineas_accion', pt.lineas_accion, 'unidad_medida', pt.unidad_medida, 'nomenclatura', pt.nomenclatura)
+          json_build_object('id', pt.id, 'lineas_accion', pt.lineas_accion, 'unidad_medida', pt.unidad_medida, 'nomenclatura', pt.nomenclatura, 'activa', pt.activa)
           ORDER BY pt.nomenclatura
         ) FILTER (WHERE pt.id IS NOT NULL) as lineas
         FROM strategies s
@@ -83,5 +83,6 @@ exports.reportes = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo reportes" })
   }
 }
+
 
 
