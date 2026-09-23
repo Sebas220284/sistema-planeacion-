@@ -44,14 +44,19 @@ exports.reporte1 = async (req, res) => {
 
     if (anio) {
       params.push(Number(anio))
+<<<<<<< HEAD
       where += `
         AND EXTRACT(YEAR FROM c.created_at) = $${params.length}
       `
+=======
+      where += ` AND c.anio = $${params.length}`
+>>>>>>> 8478073a48ed70452a833f9733ef9f3dc157d730
     }
 
 
     const r = await pool.query(`
       SELECT
+<<<<<<< HEAD
         COALESCE(da.grupo_id, c.dependency_id) AS dependency_id,
 
         COALESCE(gd.name, d.name) AS dependencia_nombre,
@@ -120,6 +125,33 @@ exports.reporte1 = async (req, res) => {
       LEFT JOIN dependencies gd
         ON gd.id = da.grupo_id
 
+=======
+        d.id                                AS dependency_id,
+        d.name                              AS dependencia_nombre,
+        d.titular,
+        COUNT(c.id)::int                    AS total_proyectos,
+        COUNT(c.id) FILTER
+          (WHERE c.estado='borrador')::int  AS proyectos_borrador,
+        COUNT(c.id) FILTER
+          (WHERE c.estado='enviado')::int   AS proyectos_enviados,
+        COUNT(c.id) FILTER
+          (WHERE c.estado='aprobado')::int  AS proyectos_aprobados,
+        COUNT(c.id) FILTER
+          (WHERE c.estado='rechazado')::int AS proyectos_rechazados,
+        COALESCE(SUM(c.costo_total), 0)    AS monto_total,
+        COALESCE(SUM(c.costo_total)
+          FILTER (WHERE c.estado='aprobado'), 0) AS monto_aprobado,
+        COALESCE(SUM(c.costo_total)
+          FILTER (WHERE c.estado='enviado'), 0)  AS monto_en_revision,
+        COALESCE(SUM(c.costo_total)
+          FILTER (WHERE c.estado='borrador'), 0) AS monto_borrador,
+        COUNT(c.id) FILTER
+          (WHERE c.pdf_habilitado=TRUE)::int AS con_pdf,
+        MAX(c.created_at)                   AS ultima_cip,
+        MAX(c.anio)::int AS anio
+      FROM dependencies d
+      INNER JOIN cip_proyectos c ON c.dependency_id = d.id
+>>>>>>> 8478073a48ed70452a833f9733ef9f3dc157d730
       ${where}
 
       GROUP BY
@@ -229,13 +261,18 @@ exports.getAnios = async (req, res) => {
 exports.reporteLineasAccion = async (req, res) => {
   try {
     const { anio, estado } = req.query;
-    const currentAnio = anio || 2026;
     
-    let estadoCondition = "c.estado != 'rechazado'";
-    const params = [Number(currentAnio)];
+    let cipWhere = "c.estado != 'rechazado'";
+    const params = [];
+    
     if (estado && estado !== 'todos') {
       params.push(estado);
-      estadoCondition = "c.estado = $2";
+      cipWhere += ` AND c.estado = $${params.length}`;
+    }
+    
+    if (anio && anio !== 'todos') {
+      params.push(Number(anio));
+      cipWhere += ` AND c.anio = $${params.length}`;
     }
 
     const query = `
@@ -247,13 +284,13 @@ exports.reporteLineasAccion = async (req, res) => {
       LEFT JOIN (
           SELECT dependency_id, COUNT(id) AS total_lineas
           FROM planning_templates
-          WHERE ejercicio = $1
+          WHERE ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
           GROUP BY dependency_id
       ) pt_agg ON pt_agg.dependency_id = d.id
       LEFT JOIN (
           SELECT dependency_id, COUNT(id) AS total_proyectos
           FROM cip_proyectos c
-          WHERE c.anio = $1 AND ${estadoCondition}
+          WHERE ${cipWhere}
           GROUP BY dependency_id
       ) c_agg ON c_agg.dependency_id = d.id
       WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
@@ -364,7 +401,7 @@ exports.reportePorEje = async (req, res) => {
     }
     if (anio) {
       params.push(Number(anio))
-      where += ` AND EXTRACT(YEAR FROM c.created_at) = $${params.length}`
+      where += ` AND c.anio = $${params.length}`
     }
 
     const r = await pool.query(`
