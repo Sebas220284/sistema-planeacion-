@@ -33,6 +33,7 @@ const mppRoutes = require("./interfaces/http/routes/mppRoutes")
 const reportesCIPRoutes = require("./interfaces/http/routes/reportesCIPRoutes")
 const auditRoutes = require("./interfaces/http/routes/auditRoutes")
 const comentariosCIPRoutes = require("./interfaces/http/routes/comentariosCIPRoutes")
+const justificantesRoutes = require("./interfaces/http/routes/justificantesRoutes")
 
 
 const app = express()
@@ -160,6 +161,7 @@ app.use("/api/mpp",mppRoutes)
 app.use("/api/reportes", reportesCIPRoutes)
 app.use("/api/audits", auditRoutes)
 app.use("/api/cip-comentarios", comentariosCIPRoutes)
+app.use("/api/justificantes", justificantesRoutes)
 
 io.on("connection", (socket) => {
 
