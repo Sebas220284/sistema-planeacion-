@@ -246,6 +246,7 @@ exports.reporteLineasAccion = async (req, res) => {
     const query = `
       SELECT 
           d.name AS dependencia_nombre,
+          d.abreviatura AS dependencia_abreviatura,
           COALESCE(pt_agg.total_lineas, 0)::int AS total_lineas,
           COALESCE(c_agg.total_proyectos, 0)::int AS total_proyectos
       FROM dependencies d
@@ -310,12 +311,68 @@ exports.reporte2 = async (req, res) => {
       resumenWhere += ` AND dependency_id = $${resumenParams.length}`
     }
 
-    const resumen = await pool.query(`
-      SELECT *
-      FROM v_reporte_cip_dep_trimestres
-      ${resumenWhere}
-      ORDER BY monto_total DESC
-    `, resumenParams)
+    
+      // ---- NEW QUERY FOR REPORTE 2 ----
+      let cipWhere = "c.estado != 'rechazado'";
+      const calParams = [];
+      if (estado && estado !== 'todos') {
+        calParams.push(estado);
+        cipWhere += ` AND c.estado = ${calParams.length}`;
+      }
+      if (anio && anio !== 'todos') {
+        calParams.push(Number(anio));
+        cipWhere += ` AND c.anio = ${calParams.length}`;
+      }
+
+      const resumenQuery = `
+        SELECT 
+            d.id,
+            d.name AS dependencia,
+            (
+                SELECT plan_municipal 
+                FROM cip_proyectos p
+                WHERE p.dependency_id = d.id 
+                GROUP BY p.plan_municipal 
+                ORDER BY COUNT(p.id) DESC 
+                LIMIT 1
+            ) AS eje,
+            COALESCE(pt_agg.total_lineas, 0)::int AS lineas_accion,
+            COALESCE(c_agg.total_proyectos, 0)::int AS num_proy,
+            COALESCE(c_agg.total_monto, 0) AS monto_total,
+            COALESCE(cal_agg.t1, 0) AS t1,
+            COALESCE(cal_agg.t2, 0) AS t2,
+            COALESCE(cal_agg.t3, 0) AS t3,
+            COALESCE(cal_agg.t4, 0) AS t4
+        FROM dependencies d
+        LEFT JOIN (
+            SELECT dependency_id, COUNT(id) AS total_lineas
+            FROM planning_templates
+            WHERE ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
+            GROUP BY dependency_id
+        ) pt_agg ON pt_agg.dependency_id = d.id
+        LEFT JOIN (
+            SELECT dependency_id, COUNT(id) AS total_proyectos, SUM(costo_total) AS total_monto
+            FROM cip_proyectos c
+            WHERE ${cipWhere}
+            GROUP BY dependency_id
+        ) c_agg ON c_agg.dependency_id = d.id
+        LEFT JOIN (
+            SELECT 
+                c.dependency_id,
+                SUM(COALESCE(cal.enero,0) + COALESCE(cal.febrero,0) + COALESCE(cal.marzo,0)) AS t1,
+                SUM(COALESCE(cal.abril,0) + COALESCE(cal.mayo,0) + COALESCE(cal.junio,0)) AS t2,
+                SUM(COALESCE(cal.julio,0) + COALESCE(cal.agosto,0) + COALESCE(cal.septiembre,0)) AS t3,
+                SUM(COALESCE(cal.octubre,0) + COALESCE(cal.noviembre,0) + COALESCE(cal.diciembre,0)) AS t4
+            FROM cip_calendario cal
+            JOIN cip_proyectos c ON cal.proyecto_id = c.id
+            WHERE ${cipWhere}
+            GROUP BY c.dependency_id
+        ) cal_agg ON cal_agg.dependency_id = d.id
+        WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
+        ORDER BY pt_agg.total_lineas DESC NULLS LAST;
+      `;
+      const resumen = await pool.query(resumenQuery, calParams);
+
 
     const totales = await pool.query(`
       SELECT
