@@ -217,7 +217,7 @@ exports.reporte1 = async (req, res) => {
 exports.getAnios = async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS anio
+      SELECT DISTINCT anio
       FROM cip_proyectos
       ORDER BY anio DESC
     `)
