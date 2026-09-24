@@ -317,11 +317,11 @@ exports.reporte2 = async (req, res) => {
       const calParams = [];
       if (estado && estado !== 'todos') {
         calParams.push(estado);
-        cipWhere += ` AND c.estado = ${calParams.length}`;
+        cipWhere += ` AND c.estado = $${calParams.length}`;
       }
       if (anio && anio !== 'todos') {
         calParams.push(Number(anio));
-        cipWhere += ` AND c.anio = ${calParams.length}`;
+        cipWhere += ` AND c.anio = $${calParams.length}`;
       }
 
       const resumenQuery = `
