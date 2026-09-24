@@ -45,7 +45,7 @@ exports.reporte1 = async (req, res) => {
     if (anio) {
       params.push(Number(anio))
       where += `
-        AND EXTRACT(YEAR FROM c.created_at) = $${params.length}
+        AND c.anio = $${params.length}
       `
     }
 
