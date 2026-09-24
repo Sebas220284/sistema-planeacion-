@@ -34,6 +34,7 @@ const reportesCIPRoutes = require("./interfaces/http/routes/reportesCIPRoutes")
 const auditRoutes = require("./interfaces/http/routes/auditRoutes")
 const comentariosCIPRoutes = require("./interfaces/http/routes/comentariosCIPRoutes")
 const justificantesRoutes = require("./interfaces/http/routes/justificantesRoutes")
+const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesRoutes")
 
 
 const app = express()
@@ -162,6 +163,7 @@ app.use("/api/reportes", reportesCIPRoutes)
 app.use("/api/audits", auditRoutes)
 app.use("/api/cip-comentarios", comentariosCIPRoutes)
 app.use("/api/justificantes", justificantesRoutes)
+app.use("/api/reportes/seguimiento", segReportesRoutes)
 
 io.on("connection", (socket) => {
 
