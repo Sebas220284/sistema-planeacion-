@@ -10,7 +10,7 @@ exports.reporte1 = async (req, res) => {
   try {
     const { estado, anio } = req.query
 
-    let where = "WHERE 1=1"
+    let where = "WHERE c.estado != 'rechazado'"
     const params = []
 
     if (req.query.user_id) {
@@ -227,11 +227,20 @@ exports.getAnios = async (req, res) => {
 
 
 exports.reporteLineasAccion = async (req, res) => {
-  try {
-    const { anio, estado } = req.query;
+    try {
+      const { anio, estado, user_id } = req.query;
     
     let cipWhere = "c.estado != 'rechazado'";
     const params = [];
+      let userFilter = "";
+      if (user_id) {
+        const userRes = await pool.query(`SELECT r.name AS rol FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1`, [user_id]);
+        if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+          params.push(user_id);
+          userFilter = ` AND d.id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`;
+          cipWhere += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`;
+        }
+      }
     
     if (estado && estado !== 'todos') {
       params.push(estado);
@@ -262,7 +271,7 @@ exports.reporteLineasAccion = async (req, res) => {
           WHERE ${cipWhere}
           GROUP BY dependency_id
       ) c_agg ON c_agg.dependency_id = d.id
-      WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
+      WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
       ORDER BY pt_agg.total_lineas DESC NULLS LAST;
     `;
     const r = await pool.query(query, params);
@@ -274,8 +283,8 @@ exports.reporteLineasAccion = async (req, res) => {
 };
 
 exports.reporte2 = async (req, res) => {
-  try {
-    const { estado, anio, dep_id, agrupado = "false" } = req.query
+    try {
+      const { estado, anio, dep_id, user_id, agrupado = "false" } = req.query
 
     let where   = "WHERE costo_total > 0"
     const params = []
@@ -315,6 +324,15 @@ exports.reporte2 = async (req, res) => {
       // ---- NEW QUERY FOR REPORTE 2 ----
       let cipWhere = "c.estado != 'rechazado'";
       const calParams = [];
+        let userFilter = "";
+        if (user_id) {
+          const userRes = await pool.query(`SELECT r.name AS rol FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1`, [user_id]);
+          if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+            calParams.push(user_id);
+            userFilter = ` AND d.id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${calParams.length})`;
+            cipWhere += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${calParams.length})`;
+          }
+        }
       if (estado && estado !== 'todos') {
         calParams.push(estado);
         cipWhere += ` AND c.estado = $${calParams.length}`;
@@ -368,7 +386,7 @@ exports.reporte2 = async (req, res) => {
             WHERE ${cipWhere}
             GROUP BY c.dependency_id
         ) cal_agg ON cal_agg.dependency_id = d.id
-        WHERE pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0
+        WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
         ORDER BY pt_agg.total_lineas DESC NULLS LAST;
       `;
       const resumen = await pool.query(resumenQuery, calParams);
@@ -403,7 +421,7 @@ exports.reporte2 = async (req, res) => {
 exports.reportePorEje = async (req, res) => {
   try {
     const { estado, anio } = req.query
-    let where = "WHERE 1=1"
+    let where = "WHERE c.estado != 'rechazado'"
     const params = []
     const pool = require("../../../database/postgres") // Ensure pool is accessible
 
