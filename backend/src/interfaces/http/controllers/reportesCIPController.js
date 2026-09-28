@@ -373,12 +373,18 @@ exports.reporte2 = async (req, res) => {
         LEFT JOIN (
             SELECT 
                 CASE 
-                    WHEN dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
-                    ELSE dependency_id
+                    WHEN c.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
+                    ELSE c.dependency_id
                 END as dep_id,
-                COUNT(id) AS total_lineas
-            FROM planning_templates
-            WHERE ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
+                COUNT(DISTINCT linea) AS total_lineas
+            FROM cip_proyectos c
+            LEFT JOIN LATERAL jsonb_array_elements_text(
+                CASE 
+                    WHEN jsonb_typeof(c.pmd_lineas_accion) = 'array' THEN c.pmd_lineas_accion 
+                    ELSE '[]'::jsonb 
+                END
+            ) AS linea ON true
+            WHERE ${cipWhere}
             GROUP BY dep_id
         ) pt_agg ON pt_agg.dep_id = d.id
         LEFT JOIN (
