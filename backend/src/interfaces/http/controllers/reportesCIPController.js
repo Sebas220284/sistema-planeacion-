@@ -271,7 +271,7 @@ exports.reporteLineasAccion = async (req, res) => {
           WHERE ${cipWhere}
           GROUP BY dependency_id
       ) c_agg ON c_agg.dependency_id = d.id
-      WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
+      WHERE d.id NOT IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') ${userFilter}
       ORDER BY pt_agg.total_lineas DESC NULLS LAST;
     `;
     const r = await pool.query(query, params);
@@ -354,13 +354,23 @@ exports.reporte2 = async (req, res) => {
         SELECT 
             d.id,
             d.name AS dependencia,
-            (
-                SELECT plan_municipal 
-                FROM cip_proyectos p
-                WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
-                GROUP BY p.plan_municipal 
-                ORDER BY COUNT(p.id) DESC 
-                LIMIT 1
+            COALESCE(
+                (
+                    SELECT plan_municipal 
+                    FROM cip_proyectos p
+                    WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                    GROUP BY p.plan_municipal 
+                    ORDER BY COUNT(p.id) DESC 
+                    LIMIT 1
+                ),
+                (
+                    SELECT pmd_eje 
+                    FROM planning_templates t
+                    WHERE (t.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND t.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                    GROUP BY t.pmd_eje 
+                    ORDER BY COUNT(t.id) DESC 
+                    LIMIT 1
+                )
             ) AS eje,
             COALESCE(pt_agg.total_lineas, 0)::int AS lineas_accion,
             COALESCE(c_agg.total_proyectos, 0)::int AS num_proy,
@@ -414,16 +424,26 @@ exports.reporte2 = async (req, res) => {
             WHERE ${cipWhere}
             GROUP BY dep_id
         ) cal_agg ON cal_agg.dep_id = d.id
-        WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
+        WHERE d.id NOT IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') ${userFilter}
         ORDER BY 
             SUBSTRING(
-                (
-                    SELECT plan_municipal 
-                    FROM cip_proyectos p
-                    WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
-                    GROUP BY p.plan_municipal 
-                    ORDER BY COUNT(p.id) DESC 
-                    LIMIT 1
+                COALESCE(
+                    (
+                        SELECT plan_municipal 
+                        FROM cip_proyectos p
+                        WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                        GROUP BY p.plan_municipal 
+                        ORDER BY COUNT(p.id) DESC 
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT pmd_eje 
+                        FROM planning_templates t
+                        WHERE (t.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND t.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                        GROUP BY t.pmd_eje 
+                        ORDER BY COUNT(t.id) DESC 
+                        LIMIT 1
+                    )
                 ) FROM '^[0-9]+'
             )::int ASC NULLS LAST, 
             pt_agg.total_lineas DESC NULLS LAST;
