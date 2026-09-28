@@ -1,10 +1,8 @@
 const pool = require("../../../database/postgres")
 
-// ── Helper: extrae info del user-agent ──
 const parsearDispositivo = (userAgent = "") => {
   const ua = userAgent.toLowerCase()
 
-  // Sistema operativo
   let so = "Desconocido"
   if (ua.includes("windows nt 10")) so = "Windows 10/11"
   else if (ua.includes("windows nt 6.3")) so = "Windows 8.1"

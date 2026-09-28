@@ -3,7 +3,6 @@ const router  = express.Router()
 const ctrl    = require("../controllers/auditController")
 const roleMiddleware = require("../middlewares/roleMiddleware")
 
-// Token is already verified globally in server.js
 router.use(roleMiddleware(["admin", "superadmin"]))
 
 router.get("/",ctrl.listar)

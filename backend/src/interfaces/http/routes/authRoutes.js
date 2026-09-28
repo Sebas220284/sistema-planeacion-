@@ -5,7 +5,6 @@ const AuthController = require("../controllers/AuthController")
 const authMiddleware = require("../middlewares/authMiddleware")
 const rateLimit = require("express-rate-limit")
 
-// 2. Escudo Anti-Fuerza Bruta para el Login
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // t
   max: 5,
