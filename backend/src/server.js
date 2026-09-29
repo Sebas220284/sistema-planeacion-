@@ -35,6 +35,7 @@ const auditRoutes = require("./interfaces/http/routes/auditRoutes")
 const comentariosCIPRoutes = require("./interfaces/http/routes/comentariosCIPRoutes")
 const justificantesRoutes = require("./interfaces/http/routes/justificantesRoutes")
 const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesRoutes")
+const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 
 
 const app = express()
@@ -164,6 +165,7 @@ app.use("/api/audits", auditRoutes)
 app.use("/api/cip-comentarios", comentariosCIPRoutes)
 app.use("/api/justificantes", justificantesRoutes)
 app.use("/api/reportes/seguimiento", segReportesRoutes)
+app.use("/api/poa-llenado", poaLlenadoRoutes)
 
 io.on("connection", (socket) => {
 

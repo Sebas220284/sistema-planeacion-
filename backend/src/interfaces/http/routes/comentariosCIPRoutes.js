@@ -14,4 +14,4 @@ router.delete("/comentario/:id",          ctrl.eliminar)
 module.exports = router
 
 
-//768ac9b7-b895-4a0c-b00f-462114fbc82e
+//id de planeacion estrategica= 768ac9b7-b895-4a0c-b00f-462114fbc82e   id de inversion publica= ec6cf929-712e-44de-99fa-316043716114 
