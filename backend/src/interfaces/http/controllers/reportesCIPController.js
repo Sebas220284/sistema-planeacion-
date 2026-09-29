@@ -289,6 +289,24 @@ exports.reporte2 = async (req, res) => {
     let where   = "WHERE costo_total > 0"
     const params = []
 
+    if (user_id) {
+      const userRes = await pool.query(`
+        SELECT r.name AS rol
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.id = $1
+      `, [user_id]);
+
+      if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+        params.push(user_id);
+        where += ` AND dependency_id IN (
+            SELECT dependency_id
+            FROM user_dependencias_asignadas
+            WHERE user_id = ${params.length}
+        )`;
+      }
+    }
+
     if (estado) {
       params.push(estado)
       where += ` AND estado = $${params.length}`
@@ -336,7 +354,7 @@ exports.reporte2 = async (req, res) => {
                         ELSE dependency_id
                     END
                 FROM user_dependencias_asignadas 
-                WHERE user_id = ${calParams.length}
+                WHERE user_id = $${calParams.length}
             )`;
             cipWhere += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${calParams.length})`;
           }
@@ -509,13 +527,15 @@ exports.reportePorEje = async (req, res) => {
     const r = await pool.query(`
       SELECT
         COALESCE(c.plan_municipal, 'Sin Eje Asignado') AS eje,
-        d.name                                  AS dependencia_nombre,
+        COALESCE(gd.name, d.name)               AS dependencia_nombre,
         COUNT(c.id)::int                        AS total_proyectos,
         COALESCE(SUM(c.costo_total), 0)         AS monto_total
       FROM cip_proyectos c
       LEFT JOIN dependencies d ON d.id = c.dependency_id
+      LEFT JOIN dep_agrupaciones da ON da.dependency_id = c.dependency_id
+      LEFT JOIN dependencies gd ON gd.id = da.grupo_id
       ${where}
-      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), d.name
+      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), COALESCE(gd.name, d.name)
       ORDER BY SUM(c.costo_total) DESC
     `, params)
 
