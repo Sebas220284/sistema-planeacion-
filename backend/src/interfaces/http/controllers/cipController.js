@@ -209,7 +209,7 @@ exports.listar = async (req, res) => {
       }
 
     const query = `
-      SELECT p.*, d.name AS dependencia_nombre,
+      SELECT p.*, COALESCE(da.grupo_id, p.dependency_id) AS dependency_id, COALESCE(gd.name, d.name) AS dependencia_nombre,
         u.name AS creado_por_nombre,
         cp.descripcion AS programa_desc,
         COUNT(DISTINCT m.id)  AS total_metas,
