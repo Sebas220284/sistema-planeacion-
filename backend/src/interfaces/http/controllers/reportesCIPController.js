@@ -271,7 +271,7 @@ exports.reporteLineasAccion = async (req, res) => {
           WHERE ${cipWhere}
           GROUP BY dependency_id
       ) c_agg ON c_agg.dependency_id = d.id
-      WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
+      WHERE d.id NOT IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') ${userFilter}
       ORDER BY pt_agg.total_lineas DESC NULLS LAST;
     `;
     const r = await pool.query(query, params);
@@ -288,6 +288,24 @@ exports.reporte2 = async (req, res) => {
 
     let where   = "WHERE costo_total > 0"
     const params = []
+
+    if (user_id) {
+      const userRes = await pool.query(`
+        SELECT r.name AS rol
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        WHERE u.id = $1
+      `, [user_id]);
+
+      if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
+        params.push(user_id);
+        where += ` AND dependency_id IN (
+            SELECT dependency_id
+            FROM user_dependencias_asignadas
+            WHERE user_id = ${params.length}
+        )`;
+      }
+    }
 
     if (estado) {
       params.push(estado)
@@ -329,7 +347,15 @@ exports.reporte2 = async (req, res) => {
           const userRes = await pool.query(`SELECT r.name AS rol FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1`, [user_id]);
           if (userRes.rows.length > 0 && userRes.rows[0].rol === 'inversion_publica') {
             calParams.push(user_id);
-            userFilter = ` AND d.id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${calParams.length})`;
+            userFilter = ` AND d.id IN (
+                SELECT 
+                    CASE 
+                        WHEN dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
+                        ELSE dependency_id
+                    END
+                FROM user_dependencias_asignadas 
+                WHERE user_id = $${calParams.length}
+            )`;
             cipWhere += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${calParams.length})`;
           }
         }
@@ -346,13 +372,23 @@ exports.reporte2 = async (req, res) => {
         SELECT 
             d.id,
             d.name AS dependencia,
-            (
-                SELECT plan_municipal 
-                FROM cip_proyectos p
-                WHERE p.dependency_id = d.id 
-                GROUP BY p.plan_municipal 
-                ORDER BY COUNT(p.id) DESC 
-                LIMIT 1
+            COALESCE(
+                (
+                    SELECT plan_municipal 
+                    FROM cip_proyectos p
+                    WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                    GROUP BY p.plan_municipal 
+                    ORDER BY COUNT(p.id) DESC 
+                    LIMIT 1
+                ),
+                (
+                    SELECT pmd_eje 
+                    FROM planning_templates t
+                    WHERE (t.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND t.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                    GROUP BY t.pmd_eje 
+                    ORDER BY COUNT(t.id) DESC 
+                    LIMIT 1
+                )
             ) AS eje,
             COALESCE(pt_agg.total_lineas, 0)::int AS lineas_accion,
             COALESCE(c_agg.total_proyectos, 0)::int AS num_proy,
@@ -363,20 +399,40 @@ exports.reporte2 = async (req, res) => {
             COALESCE(cal_agg.t4, 0) AS t4
         FROM dependencies d
         LEFT JOIN (
-            SELECT dependency_id, COUNT(id) AS total_lineas
-            FROM planning_templates
-            WHERE ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
-            GROUP BY dependency_id
-        ) pt_agg ON pt_agg.dependency_id = d.id
-        LEFT JOIN (
-            SELECT dependency_id, COUNT(id) AS total_proyectos, SUM(costo_total) AS total_monto
+            SELECT 
+                CASE 
+                    WHEN c.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
+                    ELSE c.dependency_id
+                END as dep_id,
+                COUNT(DISTINCT linea) AS total_lineas
             FROM cip_proyectos c
+            LEFT JOIN LATERAL jsonb_array_elements_text(
+                CASE 
+                    WHEN jsonb_typeof(c.pmd_lineas_accion) = 'array' THEN c.pmd_lineas_accion 
+                    ELSE '[]'::jsonb 
+                END
+            ) AS linea ON true
             WHERE ${cipWhere}
-            GROUP BY dependency_id
-        ) c_agg ON c_agg.dependency_id = d.id
+            GROUP BY dep_id
+        ) pt_agg ON pt_agg.dep_id = d.id
         LEFT JOIN (
             SELECT 
-                c.dependency_id,
+                CASE 
+                    WHEN dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
+                    ELSE dependency_id
+                END as dep_id,
+                COUNT(id) AS total_proyectos, 
+                SUM(costo_total) AS total_monto
+            FROM cip_proyectos c
+            WHERE ${cipWhere}
+            GROUP BY dep_id
+        ) c_agg ON c_agg.dep_id = d.id
+        LEFT JOIN (
+            SELECT 
+                CASE 
+                    WHEN c.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
+                    ELSE c.dependency_id
+                END as dep_id,
                 SUM(COALESCE(cal.enero,0) + COALESCE(cal.febrero,0) + COALESCE(cal.marzo,0)) AS t1,
                 SUM(COALESCE(cal.abril,0) + COALESCE(cal.mayo,0) + COALESCE(cal.junio,0)) AS t2,
                 SUM(COALESCE(cal.julio,0) + COALESCE(cal.agosto,0) + COALESCE(cal.septiembre,0)) AS t3,
@@ -384,10 +440,31 @@ exports.reporte2 = async (req, res) => {
             FROM cip_calendario cal
             JOIN cip_proyectos c ON cal.proyecto_id = c.id
             WHERE ${cipWhere}
-            GROUP BY c.dependency_id
-        ) cal_agg ON cal_agg.dependency_id = d.id
-        WHERE (pt_agg.total_lineas > 0 OR c_agg.total_proyectos > 0) ${userFilter}
-        ORDER BY pt_agg.total_lineas DESC NULLS LAST;
+            GROUP BY dep_id
+        ) cal_agg ON cal_agg.dep_id = d.id
+        WHERE d.id NOT IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') ${userFilter}
+        ORDER BY 
+            SUBSTRING(
+                COALESCE(
+                    (
+                        SELECT plan_municipal 
+                        FROM cip_proyectos p
+                        WHERE (p.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND p.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                        GROUP BY p.plan_municipal 
+                        ORDER BY COUNT(p.id) DESC 
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT pmd_eje 
+                        FROM planning_templates t
+                        WHERE (t.dependency_id = d.id OR (d.id = '11111111-1111-1111-1111-111111111101' AND t.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')))
+                        GROUP BY t.pmd_eje 
+                        ORDER BY COUNT(t.id) DESC 
+                        LIMIT 1
+                    )
+                ) FROM '^[0-9]+'
+            )::int ASC NULLS LAST, 
+            pt_agg.total_lineas DESC NULLS LAST;
       `;
       const resumen = await pool.query(resumenQuery, calParams);
 
@@ -450,13 +527,15 @@ exports.reportePorEje = async (req, res) => {
     const r = await pool.query(`
       SELECT
         COALESCE(c.plan_municipal, 'Sin Eje Asignado') AS eje,
-        d.name                                  AS dependencia_nombre,
+        COALESCE(gd.name, d.name)               AS dependencia_nombre,
         COUNT(c.id)::int                        AS total_proyectos,
         COALESCE(SUM(c.costo_total), 0)         AS monto_total
       FROM cip_proyectos c
       LEFT JOIN dependencies d ON d.id = c.dependency_id
+      LEFT JOIN dep_agrupaciones da ON da.dependency_id = c.dependency_id
+      LEFT JOIN dependencies gd ON gd.id = da.grupo_id
       ${where}
-      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), d.name
+      GROUP BY COALESCE(c.plan_municipal, 'Sin Eje Asignado'), COALESCE(gd.name, d.name)
       ORDER BY SUM(c.costo_total) DESC
     `, params)
 
