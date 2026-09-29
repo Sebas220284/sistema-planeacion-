@@ -433,11 +433,12 @@ exports.reporte2 = async (req, res) => {
                     WHEN c.dependency_id IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e') THEN '11111111-1111-1111-1111-111111111101'::uuid
                     ELSE c.dependency_id
                 END as dep_id,
-                SUM(c.monto_t1) AS t1,
-                SUM(c.monto_t2) AS t2,
-                SUM(c.monto_t3) AS t3,
-                SUM(c.monto_t4) AS t4
-            FROM v_reporte_cip_trimestres c
+                SUM(COALESCE(cal.enero,0) + COALESCE(cal.febrero,0) + COALESCE(cal.marzo,0)) AS t1,
+                SUM(COALESCE(cal.abril,0) + COALESCE(cal.mayo,0) + COALESCE(cal.junio,0)) AS t2,
+                SUM(COALESCE(cal.julio,0) + COALESCE(cal.agosto,0) + COALESCE(cal.septiembre,0)) AS t3,
+                SUM(COALESCE(cal.octubre,0) + COALESCE(cal.noviembre,0) + COALESCE(cal.diciembre,0)) AS t4
+            FROM cip_calendario cal
+            JOIN cip_proyectos c ON cal.proyecto_id = c.id
             WHERE ${cipWhere}
             GROUP BY dep_id
         ) cal_agg ON cal_agg.dep_id = d.id
