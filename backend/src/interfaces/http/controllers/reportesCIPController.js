@@ -10,7 +10,7 @@ exports.reporte1 = async (req, res) => {
   try {
     const { estado, anio } = req.query
 
-    let where = "WHERE c.estado != 'rechazado'"
+    let where = "WHERE 1=1"
     const params = []
 
     if (req.query.user_id) {
@@ -230,7 +230,7 @@ exports.reporteLineasAccion = async (req, res) => {
     try {
       const { anio, estado, user_id } = req.query;
     
-    let cipWhere = "c.estado != 'rechazado'";
+    let cipWhere = "1=1";
     const params = [];
       let userFilter = "";
       if (user_id) {
@@ -340,7 +340,7 @@ exports.reporte2 = async (req, res) => {
 
     
       // ---- NEW QUERY FOR REPORTE 2 ----
-      let cipWhere = "c.estado != 'rechazado'";
+      let cipWhere = "1=1";
       const calParams = [];
         let userFilter = "";
         if (user_id) {
@@ -498,7 +498,7 @@ exports.reporte2 = async (req, res) => {
 exports.reportePorEje = async (req, res) => {
   try {
     const { estado, anio } = req.query
-    let where = "WHERE c.estado != 'rechazado'"
+    let where = "WHERE 1=1"
     const params = []
     const pool = require("../../../database/postgres") // Ensure pool is accessible
 
