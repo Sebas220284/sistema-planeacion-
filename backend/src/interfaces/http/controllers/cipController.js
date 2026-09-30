@@ -144,6 +144,8 @@ exports.obtenerParaExportar = async (req, res) => {
           cf2.descripcion AS fuente2_desc
         FROM cip_proyectos p
         LEFT JOIN dependencies d ON d.id = p.dependency_id
+        LEFT JOIN dep_agrupaciones da ON da.dependency_id = p.dependency_id
+        LEFT JOIN dependencies gd ON gd.id = da.grupo_id
         LEFT JOIN cat_programas cp ON cp.clave = p.clave_programa
         LEFT JOIN cat_subprogramas cs ON cs.clave_prog=p.clave_programa AND cs.clave_subprog=p.clave_subprograma
         LEFT JOIN users u ON u.id = p.creado_por
