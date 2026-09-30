@@ -302,7 +302,7 @@ exports.reporte2 = async (req, res) => {
         where += ` AND dependency_id IN (
             SELECT dependency_id
             FROM user_dependencias_asignadas
-            WHERE user_id = ${params.length}
+            WHERE user_id = $${params.length}
         )`;
       }
     }
