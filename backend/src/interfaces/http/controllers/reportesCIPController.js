@@ -1,5 +1,17 @@
 const pool = require("../../../database/postgres")
 
+const formatEjeName = (str) => {
+    if (!str) return str;
+    const lowers = ['y', 'e', 'a', 'la'];
+    return str.toLowerCase().split(' ').map((word, index) => {
+        if (index > 0 && lowers.includes(word)) {
+            return word;
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+};
+
+
 const fmt = (n) =>
   Number(n || 0).toLocaleString("es-MX", {
     minimumFractionDigits: 2,
@@ -482,6 +494,15 @@ exports.reporte2 = async (req, res) => {
       ${where}
     `, params)
 
+    
+    detalle.rows = detalle.rows.map(row => {
+      if (row.eje) row.eje = formatEjeName(row.eje);
+      return row;
+    });
+    resumen.rows = resumen.rows.map(row => {
+      if (row.eje) row.eje = formatEjeName(row.eje);
+      return row;
+    });
     res.json({
       reporte:    "CIPs con Montos por Trimestre",
       generado:   new Date().toISOString(),
@@ -547,6 +568,11 @@ exports.reportePorEje = async (req, res) => {
       ${where}
     `, params)
 
+    
+    r.rows = r.rows.map(row => {
+      if (row.eje) row.eje = formatEjeName(row.eje);
+      return row;
+    });
     res.json({
       reporte: "Resumen de CIPs por Eje PMD",
       generado: new Date().toISOString(),
