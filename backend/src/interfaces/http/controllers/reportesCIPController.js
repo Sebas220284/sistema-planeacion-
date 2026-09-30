@@ -240,12 +240,26 @@ exports.reporte2 = async (req, res) => {
 
     const detalle = await pool.query(`
       SELECT 
-        v.*,
-        COALESCE(cf.descripcion, v.fuente_financiamiento_1) AS fuente_financiamiento_nombre
-      FROM v_reporte_cip_trimestres v
-      LEFT JOIN cat_fuentes_financiamiento cf ON cf.clave = v.fuente_financiamiento_1
-      ${where.replace(/dependency_id/g, 'v.dependency_id').replace(/anio/g, 'v.anio').replace(/estado/g, 'v.estado')}
-      ORDER BY v.dependencia_nombre, v.nombre_proyecto
+        c.id AS cip_id,
+        c.nombre_proyecto,
+        c.dependency_id,
+        COALESCE(da.grupo_id, c.dependency_id) AS grouped_dependency_id,
+        c.pmd_eje,
+        c.pmd_lineas_accion,
+        c.tipo_nuevo, c.tipo_continuidad, c.tipo_ampliacion, c.tipo_rehabilitacion, c.tipo_mantenimiento, c.tipo_equipamiento,
+        c.costo_total,
+        c.fuente_financiamiento_1,
+        COALESCE(cf.descripcion, c.fuente_financiamiento_1) AS fuente_financiamiento_nombre,
+        COALESCE(cal.enero,0) + COALESCE(cal.febrero,0) + COALESCE(cal.marzo,0) AS monto_t1,
+        COALESCE(cal.abril,0) + COALESCE(cal.mayo,0) + COALESCE(cal.junio,0) AS monto_t2,
+        COALESCE(cal.julio,0) + COALESCE(cal.agosto,0) + COALESCE(cal.septiembre,0) AS monto_t3,
+        COALESCE(cal.octubre,0) + COALESCE(cal.noviembre,0) + COALESCE(cal.diciembre,0) AS monto_t4
+      FROM cip_proyectos c
+      LEFT JOIN dep_agrupaciones da ON da.dependency_id = c.dependency_id
+      LEFT JOIN cip_calendario cal ON cal.proyecto_id = c.id
+      LEFT JOIN cat_fuentes_financiamiento cf ON cf.clave = c.fuente_financiamiento_1
+      ${where.replace(/dependency_id/g, 'c.dependency_id').replace(/\bestado\b/g, 'c.estado').replace(/\banio\b/g, 'c.anio').replace(/costo_total/g, 'c.costo_total')}
+      ORDER BY c.nombre_proyecto
     `, params)
 
     let resumenWhere = "WHERE monto_total > 0"
