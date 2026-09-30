@@ -239,6 +239,16 @@ exports.reporte2 = async (req, res) => {
     }
 
     const detalle = await pool.query(`
+      WITH cal_agg AS (
+        SELECT 
+          proyecto_id,
+          SUM(COALESCE(enero,0) + COALESCE(febrero,0) + COALESCE(marzo,0)) AS monto_t1,
+          SUM(COALESCE(abril,0) + COALESCE(mayo,0) + COALESCE(junio,0)) AS monto_t2,
+          SUM(COALESCE(julio,0) + COALESCE(agosto,0) + COALESCE(septiembre,0)) AS monto_t3,
+          SUM(COALESCE(octubre,0) + COALESCE(noviembre,0) + COALESCE(diciembre,0)) AS monto_t4
+        FROM cip_calendario
+        GROUP BY proyecto_id
+      )
       SELECT 
         c.id AS cip_id,
         c.nombre_proyecto,
@@ -250,13 +260,13 @@ exports.reporte2 = async (req, res) => {
         c.costo_total,
         c.fuente_financiamiento_1,
         COALESCE(cf.descripcion, c.fuente_financiamiento_1) AS fuente_financiamiento_nombre,
-        COALESCE(cal.enero,0) + COALESCE(cal.febrero,0) + COALESCE(cal.marzo,0) AS monto_t1,
-        COALESCE(cal.abril,0) + COALESCE(cal.mayo,0) + COALESCE(cal.junio,0) AS monto_t2,
-        COALESCE(cal.julio,0) + COALESCE(cal.agosto,0) + COALESCE(cal.septiembre,0) AS monto_t3,
-        COALESCE(cal.octubre,0) + COALESCE(cal.noviembre,0) + COALESCE(cal.diciembre,0) AS monto_t4
+        COALESCE(cal.monto_t1, 0) AS monto_t1,
+        COALESCE(cal.monto_t2, 0) AS monto_t2,
+        COALESCE(cal.monto_t3, 0) AS monto_t3,
+        COALESCE(cal.monto_t4, 0) AS monto_t4
       FROM cip_proyectos c
       LEFT JOIN dep_agrupaciones da ON da.dependency_id = c.dependency_id
-      LEFT JOIN cip_calendario cal ON cal.proyecto_id = c.id
+      LEFT JOIN cal_agg cal ON cal.proyecto_id = c.id
       LEFT JOIN cat_fuentes_financiamiento cf ON cf.clave = c.fuente_financiamiento_1
       ${where.replace(/dependency_id/g, 'c.dependency_id').replace(/\bestado\b/g, 'c.estado').replace(/\banio\b/g, 'c.anio').replace(/costo_total/g, 'c.costo_total')}
       ORDER BY c.nombre_proyecto
