@@ -20,10 +20,11 @@ const fmt = (n) =>
 
 exports.reporte1 = async (req, res) => {
   try {
-    const { estado, anio } = req.query
+    const { estado, anio } = req.query;
 
-    let where = "WHERE 1=1"
-    const params = []
+    let c_where = "WHERE 1=1";
+    let d_where = "WHERE 1=1";
+    const params = [];
 
     if (req.query.user_id) {
       const userRes = await pool.query(`
@@ -31,200 +32,105 @@ exports.reporte1 = async (req, res) => {
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id
         WHERE u.id = $1
-      `, [req.query.user_id])
+      `, [req.query.user_id]);
 
       if (
         userRes.rows.length > 0 &&
         userRes.rows[0].rol === 'inversion_publica'
       ) {
-        params.push(req.query.user_id)
-
-        where += `
-          AND c.dependency_id IN (
-            SELECT dependency_id
-            FROM user_dependencias_asignadas
-            WHERE user_id = $${params.length}
-          )
-        `
+        params.push(req.query.user_id);
+        
+        c_where += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})`;
+        
+        d_where += ` AND (
+            d.id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})
+            OR COALESCE(da.grupo_id, d.id) IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length})
+            OR d.id IN (
+                SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${params.length}
+            )
+        )`;
       }
     }
 
-    if (estado) {
-      params.push(estado)
-      where += ` AND c.estado = $${params.length}`
+    if (estado && estado !== 'todos') {
+      params.push(estado);
+      c_where += ` AND c.estado = $${params.length}`;
     }
 
-    if (anio) {
-      params.push(Number(anio))
-      where += `
-        AND c.anio = $${params.length}
-      `
+    if (anio && anio !== 'todos') {
+      params.push(Number(anio));
+      c_where += ` AND c.anio = $${params.length}`;
     }
-
 
     const r = await pool.query(`
       SELECT
-        COALESCE(da.grupo_id, c.dependency_id) AS dependency_id,
-
+        COALESCE(da.grupo_id, d.id) AS dependency_id,
         COALESCE(gd.name, d.name) AS dependencia_nombre,
-
         COALESCE(gd.titular, d.titular) AS titular,
-
         COUNT(c.id)::int AS total_proyectos,
-
-        COUNT(c.id) FILTER (
-          WHERE c.estado = 'borrador'
-        )::int AS proyectos_borrador,
-
-        COUNT(c.id) FILTER (
-          WHERE c.estado = 'enviado'
-        )::int AS proyectos_enviados,
-
-        COUNT(c.id) FILTER (
-          WHERE c.estado = 'aprobado'
-        )::int AS proyectos_aprobados,
-
-        COUNT(c.id) FILTER (
-          WHERE c.estado = 'rechazado'
-        )::int AS proyectos_rechazados,
-
-        COALESCE(
-          SUM(c.costo_total),
-          0
-        ) AS monto_total,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'aprobado'),
-          0
-        ) AS monto_aprobado,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'enviado'),
-          0
-        ) AS monto_en_revision,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'borrador'),
-          0
-        ) AS monto_borrador,
-
-        COUNT(c.id) FILTER (
-          WHERE c.pdf_habilitado = TRUE
-        )::int AS con_pdf,
-
+        COUNT(c.id) FILTER (WHERE c.estado = 'borrador')::int AS proyectos_borrador,
+        COUNT(c.id) FILTER (WHERE c.estado = 'enviado')::int AS proyectos_enviados,
+        COUNT(c.id) FILTER (WHERE c.estado = 'aprobado')::int AS proyectos_aprobados,
+        COUNT(c.id) FILTER (WHERE c.estado = 'rechazado')::int AS proyectos_rechazados,
+        COALESCE(SUM(c.costo_total), 0) AS monto_total,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'aprobado'), 0) AS monto_aprobado,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'enviado'), 0) AS monto_en_revision,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'borrador'), 0) AS monto_borrador,
+        COUNT(c.id) FILTER (WHERE c.pdf_habilitado = TRUE)::int AS con_pdf,
         MAX(c.created_at) AS ultima_cip,
-
-        EXTRACT(
-          YEAR FROM MAX(c.created_at)
-        )::int AS anio
-
-      FROM cip_proyectos c
-
-      INNER JOIN dependencies d
-        ON d.id = c.dependency_id
-
-      LEFT JOIN dep_agrupaciones da
-        ON da.dependency_id = c.dependency_id
-
-      LEFT JOIN dependencies gd
-        ON gd.id = da.grupo_id
-
-      ${where}
-
+        EXTRACT(YEAR FROM MAX(c.created_at))::int AS anio
+      FROM dependencies d
+      LEFT JOIN dep_agrupaciones da ON da.dependency_id = d.id
+      LEFT JOIN dependencies gd ON gd.id = da.grupo_id
+      LEFT JOIN (
+          SELECT * FROM cip_proyectos c ${c_where}
+      ) c ON c.dependency_id = d.id
+      ${d_where}
       GROUP BY
-        COALESCE(da.grupo_id, c.dependency_id),
+        COALESCE(da.grupo_id, d.id),
         COALESCE(gd.name, d.name),
         COALESCE(gd.titular, d.titular)
-
       ORDER BY
-        SUM(c.costo_total) DESC NULLS LAST
-    `, params)
-
-    
+        SUM(c.costo_total) DESC NULLS LAST,
+        COALESCE(gd.name, d.name) ASC
+    `, params);
 
     const totales = await pool.query(`
       SELECT
-        COUNT(
-          DISTINCT COALESCE(da.grupo_id, c.dependency_id)
-        )::int AS total_dependencias,
-
+        COUNT(DISTINCT COALESCE(da.grupo_id, d.id))::int AS total_dependencias,
         COUNT(c.id)::int AS total_proyectos,
-
-        COALESCE(
-          SUM(c.costo_total),
-          0
-        ) AS gran_total,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'aprobado'),
-          0
-        ) AS total_aprobado,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'enviado'),
-          0
-        ) AS total_en_revision,
-
-        COALESCE(
-          SUM(c.costo_total)
-          FILTER (WHERE c.estado = 'borrador'),
-          0
-        ) AS total_borrador,
-
-        COUNT(c.id)
-          FILTER (WHERE c.estado = 'aprobado')::int
-          AS num_aprobados,
-
-        COUNT(c.id)
-          FILTER (WHERE c.estado = 'enviado')::int
-          AS num_enviados,
-
-        COUNT(c.id)
-          FILTER (WHERE c.estado = 'borrador')::int
-          AS num_borradores
-
-      FROM cip_proyectos c
-
-      INNER JOIN dependencies d
-        ON d.id = c.dependency_id
-
-      LEFT JOIN dep_agrupaciones da
-        ON da.dependency_id = c.dependency_id
-
-      LEFT JOIN dependencies gd
-        ON gd.id = da.grupo_id
-
-      ${where}
-    `, params)
+        COALESCE(SUM(c.costo_total), 0) AS gran_total,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'aprobado'), 0) AS total_aprobado,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'enviado'), 0) AS total_en_revision,
+        COALESCE(SUM(c.costo_total) FILTER (WHERE c.estado = 'borrador'), 0) AS total_borrador,
+        COUNT(c.id) FILTER (WHERE c.estado = 'aprobado')::int AS num_aprobados,
+        COUNT(c.id) FILTER (WHERE c.estado = 'enviado')::int AS num_enviados,
+        COUNT(c.id) FILTER (WHERE c.estado = 'borrador')::int AS num_borradores
+      FROM dependencies d
+      LEFT JOIN dep_agrupaciones da ON da.dependency_id = d.id
+      LEFT JOIN dependencies gd ON gd.id = da.grupo_id
+      LEFT JOIN (
+          SELECT * FROM cip_proyectos c ${c_where}
+      ) c ON c.dependency_id = d.id
+      ${d_where}
+    `, params);
 
     res.json({
       reporte: "Resumen de CIPs por Dependencia",
       generado: new Date().toISOString(),
-
       filtros: {
         estado: estado || "todos",
         anio: anio || "todos"
       },
-
       dependencias: r.rows,
-
       totales: totales.rows[0]
-    })
+    });
 
   } catch (e) {
-    console.error("Error reporte 1 CIP:", e)
-
-    res.status(500).json({
-      error: e.message
-    })
+    console.error("Error reporte 1 CIP:", e);
+    res.status(500).json({ error: e.message });
   }
 }
-
 
 exports.getAnios = async (req, res) => {
   try {
@@ -333,10 +239,13 @@ exports.reporte2 = async (req, res) => {
     }
 
     const detalle = await pool.query(`
-      SELECT *
-      FROM v_reporte_cip_trimestres
-      ${where}
-      ORDER BY dependencia_nombre, nombre_proyecto
+      SELECT 
+        v.*,
+        COALESCE(cf.descripcion, v.fuente_financiamiento_1) AS fuente_financiamiento_nombre
+      FROM v_reporte_cip_trimestres v
+      LEFT JOIN cat_fuentes_financiamiento cf ON cf.clave = v.fuente_financiamiento_1
+      ${where.replace(/dependency_id/g, 'v.dependency_id').replace(/anio/g, 'v.anio').replace(/estado/g, 'v.estado')}
+      ORDER BY v.dependencia_nombre, v.nombre_proyecto
     `, params)
 
     let resumenWhere = "WHERE monto_total > 0"
