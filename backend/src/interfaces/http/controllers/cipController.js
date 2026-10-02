@@ -214,20 +214,16 @@ exports.listar = async (req, res) => {
       SELECT p.*, COALESCE(da.grupo_id, p.dependency_id) AS dependency_id, COALESCE(gd.name, d.name) AS dependencia_nombre,
         u.name AS creado_por_nombre,
         cp.descripcion AS programa_desc,
-        COUNT(DISTINCT m.id)  AS total_metas,
-        COUNT(DISTINCT f.id)  AS total_fotos,
-        COALESCE(SUM(dp.importe_con_iva), 0) AS presupuesto_calculado
+        (SELECT COUNT(id) FROM cip_metas WHERE proyecto_id = p.id) AS total_metas,
+        (SELECT COUNT(id) FROM cip_fotos WHERE proyecto_id = p.id) AS total_fotos,
+        (SELECT COALESCE(SUM(importe_con_iva), 0) FROM cip_desglose_presupuesto WHERE proyecto_id = p.id) AS presupuesto_calculado
       FROM cip_proyectos p
       LEFT JOIN dependencies d   ON d.id   = p.dependency_id
       LEFT JOIN dep_agrupaciones da ON da.dependency_id = p.dependency_id
       LEFT JOIN dependencies gd ON gd.id = da.grupo_id
       LEFT JOIN users u           ON u.id   = p.creado_por
       LEFT JOIN cat_programas cp  ON cp.clave = p.clave_programa
-      LEFT JOIN cip_metas m       ON m.proyecto_id = p.id
-      LEFT JOIN cip_fotos f       ON f.proyecto_id = p.id
-      LEFT JOIN cip_desglose_presupuesto dp ON dp.proyecto_id = p.id
       ${whereClause}
-      GROUP BY p.id, d.name, u.name, cp.descripcion, da.grupo_id, gd.name
       ORDER BY p.created_at DESC
     `;
     const r = await pool.query(query, params);
