@@ -8,4 +8,6 @@ router.get("/cip/anios",    ctrl.getAnios)
 router.get("/cip/reporte2", ctrl.reporte2)
 router.get("/cip/reporteLineasAccion", ctrl.reporteLineasAccion)
 
+router.get("/cip/reportePorPrograma", ctrl.reportePorPrograma)
+
 module.exports = router

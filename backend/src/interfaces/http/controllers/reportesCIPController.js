@@ -518,3 +518,98 @@ exports.reportePorEje = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+
+exports.reportePorPrograma = async (req, res) => {
+  try {
+    const { anio, estado } = req.query;
+    let params = [];
+    let pWhere = "1=1";
+    
+    let paramCount = 1;
+    if (anio && String(anio).toLowerCase() !== 'todos') {
+      pWhere += ` AND p.anio = $${paramCount}`;
+      params.push(Number(anio));
+      paramCount++;
+    }
+    if (estado && String(estado).toLowerCase() !== 'todos') {
+      pWhere += ` AND p.estado = $${paramCount}`;
+      params.push(estado);
+      paramCount++;
+    }
+
+    const query = `
+      SELECT 
+        cp.clave AS programa_clave,
+        cp.descripcion AS programa_desc,
+        p.id AS proyecto_id,
+        p.nombre_proyecto,
+        p.costo_total,
+        p.estado,
+        p.pmd_eje,
+        p.pmd_lineas_accion,
+        f1.descripcion AS fuente1_desc,
+        f2.descripcion AS fuente2_desc,
+        p.tipo_nuevo, p.tipo_continuidad, p.tipo_ampliacion, p.tipo_rehabilitacion, p.tipo_mantenimiento, p.tipo_construccion, p.tipo_equipamiento, p.tipo_instalacion,
+        (SELECT COALESCE(SUM(c.enero + c.febrero + c.marzo), 0) FROM cip_calendario c WHERE c.proyecto_id = p.id) AS t1,
+        (SELECT COALESCE(SUM(c.abril + c.mayo + c.junio), 0) FROM cip_calendario c WHERE c.proyecto_id = p.id) AS t2,
+        (SELECT COALESCE(SUM(c.julio + c.agosto + c.septiembre), 0) FROM cip_calendario c WHERE c.proyecto_id = p.id) AS t3,
+        (SELECT COALESCE(SUM(c.octubre + c.noviembre + c.diciembre), 0) FROM cip_calendario c WHERE c.proyecto_id = p.id) AS t4
+      FROM cat_programas cp
+      LEFT JOIN cip_proyectos p ON p.clave_programa = cp.clave AND ${pWhere}
+      LEFT JOIN cat_fuentes_financiamiento f1 ON f1.clave = p.fuente_financiamiento_1
+      LEFT JOIN cat_fuentes_financiamiento f2 ON f2.clave = p.fuente_financiamiento_2
+      ORDER BY cp.clave, p.nombre_proyecto
+    `;
+    const pool = require("../../../database/postgres");
+    const r = await pool.query(query, params);
+    
+    // Grouping manually to guarantee all programs are returned properly
+    const programas = {};
+    for (const row of r.rows) {
+      if (!programas[row.programa_clave]) {
+        programas[row.programa_clave] = {
+          clave: row.programa_clave,
+          descripcion: row.programa_desc,
+          proyectos: []
+        };
+      }
+      if (row.proyecto_id) {
+        
+        let fuentes = [];
+        if (row.fuente1_desc) fuentes.push(row.fuente1_desc);
+        if (row.fuente2_desc) fuentes.push(row.fuente2_desc);
+        
+        let tipos = [];
+        if (row.tipo_nuevo) tipos.push("Nuevo");
+        if (row.tipo_continuidad) tipos.push("Continuidad");
+        if (row.tipo_ampliacion) tipos.push("Ampliación");
+        if (row.tipo_rehabilitacion) tipos.push("Rehabilitación");
+        if (row.tipo_mantenimiento) tipos.push("Mantenimiento");
+        if (row.tipo_construccion) tipos.push("Construcción");
+        if (row.tipo_equipamiento) tipos.push("Equipamiento");
+        if (row.tipo_instalacion) tipos.push("Instalación");
+
+        programas[row.programa_clave].proyectos.push({
+          id: row.proyecto_id,
+          nombre: row.nombre_proyecto,
+          costo_total: row.costo_total,
+          estado: row.estado,
+          fuente: fuentes.join(', '),
+          tipo: tipos.join(', '),
+          t1: row.t1,
+          t2: row.t2,
+          t3: row.t3,
+          t4: row.t4,
+          pmd_eje: row.pmd_eje,
+          pmd_lineas_accion: row.pmd_lineas_accion
+        });
+
+      }
+    }
+    
+    res.json(Object.values(programas));
+  } catch (e) {
+    console.error("Error en reportePorPrograma", e);
+    res.status(500).json({ error: e.message });
+  }
+};
