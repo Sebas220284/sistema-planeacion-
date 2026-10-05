@@ -43,6 +43,7 @@ rows.forEach(r => {
       ejercicio: r.ejercicio,
       columna1: r.columna1,
         activa: r.activa,
+        estado: r.estado,
       lineas_accion: r.lineas_accion,
       nomenclatura: r.nomenclatura,
       nombre2: r.nombre2,
@@ -59,3 +60,4 @@ return user
 }
 
 module.exports = GetCurrentUser
+

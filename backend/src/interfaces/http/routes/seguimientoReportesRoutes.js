@@ -1,6 +1,9 @@
 const express = require("express")
 const router  = express.Router()
 const ctrl    = require("../controllers/seguimientoReportesController")
+const roleMiddleware = require("../middlewares/roleMiddleware")
+
+router.use(roleMiddleware(["planeacion", "admin", "superadmin"]))
 
 
 router.get("/anual",                    ctrl.reporteAnual)
