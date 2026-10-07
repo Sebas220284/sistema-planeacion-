@@ -1,10 +1,10 @@
 const pool = require("../../../database/postgres")
 
 const ESTADO_CFG = {
-  completo:   { color:"#16a34a", bg:"#d1fae5", borde:"#6ee7b7", emoji:"✅", label:"Completo"   },
-  en_proceso: { color:"#d97706", bg:"#fef3c7", borde:"#fcd34d", emoji:"🔄", label:"En proceso" },
-  sin_avance: { color:"#dc2626", bg:"#fee2e2", borde:"#fca5a5", emoji:"⏳", label:"Sin avance"  },
-  sin_lineas: { color:"#6b7280", bg:"#f3f4f6", borde:"#e5e7eb", emoji:"➖", label:"Sin líneas"  },
+  completo:   { color:"#16a34a", bg:"#d1fae5", borde:"#6ee7b7", label:"Completo"   },
+  en_proceso: { color:"#d97706", bg:"#fef3c7", borde:"#fcd34d",  label:"En proceso" },
+  sin_avance: { color:"#dc2626", bg:"#fee2e2", borde:"#fca5a5",  label:"Sin avance"  },
+  sin_lineas: { color:"#6b7280", bg:"#f3f4f6", borde:"#e5e7eb",  label:"Sin líneas"  },
 }
 
 exports.getPanelLlenado = async (req, res) => {
