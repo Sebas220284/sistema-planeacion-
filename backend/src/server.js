@@ -36,6 +36,7 @@ const comentariosCIPRoutes = require("./interfaces/http/routes/comentariosCIPRou
 const justificantesRoutes = require("./interfaces/http/routes/justificantesRoutes")
 const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesRoutes")
 const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
+const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 
 
 const app = express()
@@ -166,6 +167,8 @@ app.use("/api/cip-comentarios", comentariosCIPRoutes)
 app.use("/api/justificantes", justificantesRoutes)
 app.use("/api/reportes/seguimiento", segReportesRoutes)
 app.use("/api/poa-llenado", poaLlenadoRoutes)
+app.use("/api/estrategica", estrategicaRoutes)
+app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
 
 io.on("connection", (socket) => {
 

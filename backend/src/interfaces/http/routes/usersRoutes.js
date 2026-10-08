@@ -9,9 +9,11 @@ router.get("/",ctrl.listar)
 router.get("/roles",ctrl.getRoles)
 router.get("/:id",ctrl.obtener)
 router.post("/",ctrl.crear)
+router.put("/masivos/dependencias", ctrl.actualizarPermisosMasivos)
 router.put("/:id",ctrl.actualizar)
 router.put("/:id/password",ctrl.cambiarPassword)
 router.put("/:id/permisos",ctrl.actualizarPermisos)
+router.post("/sync-dependencias", ctrl.syncDependencias)
 router.delete("/:id",ctrl.eliminar)
 
 module.exports = router

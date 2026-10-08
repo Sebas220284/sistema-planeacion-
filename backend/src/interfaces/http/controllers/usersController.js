@@ -165,3 +165,57 @@ exports.eliminar = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+
+exports.syncDependencias = async (req, res) => {
+  try {
+    const { nuevosPermisos } = req.body;
+    if (!Array.isArray(nuevosPermisos)) return res.status(400).json({ error: "nuevosPermisos debe ser un arreglo" });
+
+    const result = await pool.query(`SELECT id, permisos_menu FROM users WHERE role_id = (SELECT id FROM roles WHERE name = 'dependencias' LIMIT 1)`);
+    let count = 0;
+
+    for (const row of result.rows) {
+      let perms = [];
+      if (typeof row.permisos_menu === 'string') {
+        try { perms = JSON.parse(row.permisos_menu); } catch(e) {}
+      } else if (Array.isArray(row.permisos_menu)) {
+        perms = row.permisos_menu;
+      }
+
+      let modified = false;
+      for (const p of nuevosPermisos) {
+        if (!perms.includes(p)) {
+          perms.push(p);
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        await pool.query(`UPDATE users SET permisos_menu = $1 WHERE id = $2`, [JSON.stringify(perms), row.id]);
+        count++;
+      }
+    }
+
+    res.json({ message: `Permisos sincronizados correctamente en ${count} dependencias.` });
+  } catch (e) {
+    console.error("Error sincronizando permisos:", e);
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.actualizarPermisosMasivos = async (req, res) => {
+  try {
+    const { permisos } = req.body;
+    if (!Array.isArray(permisos)) return res.status(400).json({ error: "permisos debe ser un arreglo" });
+
+    const result = await pool.query(
+      `UPDATE users SET permisos_menu = $1 WHERE role_id = (SELECT id FROM roles WHERE name = 'dependencias' LIMIT 1) RETURNING id`, 
+      [JSON.stringify(permisos)]
+    );
+    
+    res.json({ message: `Permisos masivos actualizados correctamente en ${result.rowCount} dependencias.` });
+  } catch (e) {
+    console.error("Error actualizando permisos masivos:", e);
+    res.status(500).json({ error: e.message });
+  }
+};
