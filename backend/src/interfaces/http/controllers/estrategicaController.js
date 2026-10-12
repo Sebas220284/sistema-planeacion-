@@ -42,19 +42,21 @@ exports.obtenerAlineacionPorDependencia = async (req, res) => {
            SELECT array_agg(d.name)
            FROM nueva_alineacion n2
            JOIN dependencies d ON d.id = n2.dependencia_id
-           WHERE n2.estrategia = n.estrategia AND n2.dependencia_id != $1
+           WHERE n2.estrategia = n.estrategia AND n2.administracion = n.administracion AND n2.dependencia_id != $1
          ) as compartida_con,
          (
            SELECT coalesce(json_agg(json_build_object(
              'id', la.id,
              'nomenclatura', la.nomenclatura,
              'descripcion', la.descripcion,
-             'dependencia_nombre', d3.name
+             'dependencia_nombre', d3.name,
+              'estado', la.estado,
+              'motivo_rechazo', la.motivo_rechazo
            ) ORDER BY la.nomenclatura ASC), '[]'::json)
            FROM lineas_accion la
            JOIN dependencies d3 ON d3.id = la.dependencia_id
            JOIN nueva_alineacion na ON na.id = la.alineacion_id
-           WHERE na.estrategia = n.estrategia
+           WHERE na.estrategia = n.estrategia AND na.administracion = n.administracion
          ) as lineas
        FROM nueva_alineacion n
        WHERE n.dependencia_id = $1 
