@@ -14,7 +14,7 @@ exports.crearPlaneacion = async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error("Error al crear planeaciÃ³n estratÃ©gica:", error);
+    console.error("Error al crear planeación estrategica:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };
@@ -65,7 +65,7 @@ exports.obtenerAlineacionPorDependencia = async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    console.error("Error al obtener alineaciÃ³n de dependencia:", error);
+    console.error("Error al obtener alineacion de dependencia:", error);
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };

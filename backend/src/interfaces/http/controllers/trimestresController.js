@@ -42,6 +42,33 @@ exports.getByLinea = async (req, res) => {
     res.status(500).json({ error: "Error obteniendo trimestres" })
   }
 }
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_LINEAS_POR_PETICION = 1000
+
+// Igual que getByLinea pero para varias líneas en una sola petición.
+// Responde un objeto { [planning_id]: [...trimestres] }; las líneas sin registros devuelven [].
+exports.getByLineas = async (req, res) => {
+  try {
+    const ids = req.body && req.body.ids
+    if (!Array.isArray(ids) || ids.length > MAX_LINEAS_POR_PETICION ||
+        !ids.every(id => typeof id === "string" && UUID_RE.test(id))) {
+      return res.status(400).json({ error: `ids debe ser un arreglo de hasta ${MAX_LINEAS_POR_PETICION} UUID` })
+    }
+
+    const unicos = [...new Set(ids.map(id => id.toLowerCase()))]
+    const porLinea = Object.fromEntries(unicos.map(id => [id, []]))
+
+    if (unicos.length) {
+      const filas = await repository.getTrimestresByLineas(unicos)
+      filas.forEach(f => porLinea[f.planning_id].push(f))
+    }
+
+    res.json(porLinea)
+  } catch(error) {
+    console.error(error)
+    res.status(500).json({ error: "Error obteniendo trimestres" })
+  }
+}
 exports.editarDirecto = async (req, res) => {
   try {
     const { planning_id, anio, trimestre, tipo, valor, comentario } = req.body

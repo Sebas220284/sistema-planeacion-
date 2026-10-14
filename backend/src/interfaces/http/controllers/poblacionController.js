@@ -16,12 +16,16 @@ exports.getTodos = async (req, res) => {
           COALESCE(
             json_agg(
               json_build_object('id', s.id, 'texto', s.texto, 'orden', s.orden)
-              ORDER BY s.orden
+              ORDER BY s.orden, s.id
             ) FILTER (WHERE s.id IS NOT NULL),
             '[]'
           ) AS sublista
         FROM cip_grupos_caracteristicas c
-        LEFT JOIN cip_grupos_sublista s ON s.caracteristica_id = c.id
+        LEFT JOIN (
+          SELECT DISTINCT ON (caracteristica_id, texto, orden) id, caracteristica_id, texto, orden
+          FROM cip_grupos_sublista
+          ORDER BY caracteristica_id, texto, orden, id
+        ) s ON s.caracteristica_id = c.id
         WHERE c.grupo_id = $1
         GROUP BY c.id, c.tipo, c.texto, c.es_lista, c.orden
         ORDER BY c.tipo, c.orden
@@ -57,12 +61,16 @@ exports.getUno = async (req, res) => {
         COALESCE(
           json_agg(
             json_build_object('id', s.id, 'texto', s.texto)
-            ORDER BY s.orden
+            ORDER BY s.orden, s.id
           ) FILTER (WHERE s.id IS NOT NULL),
           '[]'
         ) AS sublista
       FROM cip_grupos_caracteristicas c
-      LEFT JOIN cip_grupos_sublista s ON s.caracteristica_id = c.id
+      LEFT JOIN (
+          SELECT DISTINCT ON (caracteristica_id, texto, orden) id, caracteristica_id, texto, orden
+          FROM cip_grupos_sublista
+          ORDER BY caracteristica_id, texto, orden, id
+        ) s ON s.caracteristica_id = c.id
       WHERE c.grupo_id = $1
       GROUP BY c.id ORDER BY c.tipo, c.orden
     `, [req.params.id])

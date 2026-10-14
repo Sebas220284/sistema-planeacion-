@@ -116,6 +116,14 @@ async getTrimestres(planning_id) {
   )
   return result.rows
 }
+
+async getTrimestresByLineas(planning_ids) {
+  const result = await pool.query(
+    `SELECT * FROM planning_trimestres WHERE planning_id = ANY($1::uuid[])`,
+    [planning_ids]
+  )
+  return result.rows
+}
  
 
 }
