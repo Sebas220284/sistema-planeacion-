@@ -198,5 +198,5 @@ exports.getExportData = async (req, res) => {
       generado:        new Date().toISOString(),
       estado_cfg:      ESTADO_CFG
     })
-  } catch(e) { res.status(500).json({ error: e.message }) }
+  } catch(e) { res.status(500).json({ error: e.message }) } 
 }
