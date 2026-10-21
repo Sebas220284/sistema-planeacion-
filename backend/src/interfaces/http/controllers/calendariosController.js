@@ -1,4 +1,5 @@
 const pool = require("../../../database/postgres");
+const round2 = (v) => Math.round((Number(v || 0) + Number.EPSILON) * 100) / 100;
 
 const initCalendarioTable = async () => {
   await pool.query(`
@@ -37,7 +38,15 @@ exports.getCalendario = async (req, res) => {
       WHERE c.proyecto_id=$1 
       ORDER BY c.id
     `, [req.params.id]);
-    res.json(r.rows);
+    const rows = r.rows.map(c => ({
+      ...c,
+      enero: round2(c.enero), febrero: round2(c.febrero), marzo: round2(c.marzo),
+      abril: round2(c.abril), mayo: round2(c.mayo), junio: round2(c.junio),
+      julio: round2(c.julio), agosto: round2(c.agosto), septiembre: round2(c.septiembre),
+      octubre: round2(c.octubre), noviembre: round2(c.noviembre), diciembre: round2(c.diciembre),
+      total: round2(c.total)
+    }));
+    res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }) }
 };
 
@@ -54,8 +63,8 @@ exports.agregarCalendario = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *
     `, [
       req.params.id, desglose_id, 
-      enero||0, febrero||0, marzo||0, abril||0, mayo||0, junio||0, 
-      julio||0, agosto||0, septiembre||0, octubre||0, noviembre||0, diciembre||0
+      round2(enero), round2(febrero), round2(marzo), round2(abril), round2(mayo), round2(junio), 
+      round2(julio), round2(agosto), round2(septiembre), round2(octubre), round2(noviembre), round2(diciembre)
     ]);
     res.json(r.rows[0]);
   } catch(e) { res.status(500).json({ error: e.message }) }
@@ -73,8 +82,8 @@ exports.actualizarCalendario = async (req, res) => {
           julio=$7, agosto=$8, septiembre=$9, octubre=$10, noviembre=$11, diciembre=$12
       WHERE id=$13 RETURNING *
     `, [
-      enero||0, febrero||0, marzo||0, abril||0, mayo||0, junio||0, 
-      julio||0, agosto||0, septiembre||0, octubre||0, noviembre||0, diciembre||0, 
+      round2(enero), round2(febrero), round2(marzo), round2(abril), round2(mayo), round2(junio), 
+      round2(julio), round2(agosto), round2(septiembre), round2(octubre), round2(noviembre), round2(diciembre), 
       req.params.cid
     ]);
     res.json(r.rows[0]);

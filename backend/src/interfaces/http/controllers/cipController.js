@@ -32,7 +32,8 @@ const limpiar = (body) => {
   return limpio
 }
 
-const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0)
+const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0);
+const round2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
 
 
 // CATÁLOGOS
@@ -40,7 +41,8 @@ const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) ||
 exports.getCatProgramas = async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM cat_programas ORDER BY clave`)
-    res.json(r.rows)
+    const rows = r.rows.map(d => ({ ...d, importe_sin_iva: round2(d.importe_sin_iva), importe_con_iva: round2(d.importe_con_iva) }));
+    res.json(rows)
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
@@ -164,7 +166,17 @@ exports.obtenerParaExportar = async (req, res) => {
       `, [req.params.id])
     ])
     if (!proyecto.rows[0]) return res.status(404).json({ error: "Proyecto no encontrado" })
-    res.json({ ...proyecto.rows[0], metas: metas.rows, desglose: desglose.rows, calendario: calendario.rows })
+    const desgloseRows = desglose.rows.map(d => ({ ...d, importe_sin_iva: round2(d.importe_sin_iva), importe_con_iva: round2(d.importe_con_iva) }));
+    const calendarioRows = calendario.rows.map(c => ({
+      ...c,
+      enero: round2(c.enero), febrero: round2(c.febrero), marzo: round2(c.marzo),
+      abril: round2(c.abril), mayo: round2(c.mayo), junio: round2(c.junio),
+      julio: round2(c.julio), agosto: round2(c.agosto), septiembre: round2(c.septiembre),
+      octubre: round2(c.octubre), noviembre: round2(c.noviembre), diciembre: round2(c.diciembre),
+      total: round2(c.total)
+    }));
+    const pRow = proyecto.rows[0] ? { ...proyecto.rows[0], costo_total: round2(proyecto.rows[0].costo_total) } : null;
+    res.json({ ...pRow, metas: metas.rows, desglose: desgloseRows, calendario: calendarioRows })
   } catch(e) { console.error(e); res.status(500).json({ error: e.message }) }
 }
 
@@ -343,7 +355,7 @@ exports.agregarDesglose = async (req, res) => {
       req.body.partida_desc  || null,
       req.body.grupo_nombre  || null,
       req.body.descripcion   || null,
-      n(req.body.importe_sin_iva),
+      round2(req.body.importe_sin_iva),
       req.body.tiene_iva !== false,
       n(req.body.orden)
     ])
