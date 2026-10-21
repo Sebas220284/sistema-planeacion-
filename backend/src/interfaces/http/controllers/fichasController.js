@@ -952,8 +952,15 @@ exports.indicadorConPOT = async (req, res) => {
 exports.indicadorConPOT = async (req, res) => {
   try {
     const { strategy_id, dependency_id } = req.params;
-    const anioIni = parseInt(req.query.anio_inicio) || 2025;
-    const anioFin = parseInt(req.query.anio_fin) || 2027;
+    const anio = req.query.anio ? parseInt(req.query.anio) : null;  
+
+    if (anio !== null && ![2025, 2026, 2027].includes(anio)) {
+      return res.status(400).json({ error: "anio debe ser 2025, 2026 o 2027" });
+    }
+
+    const anioIni = anio || 2025;
+    const anioFin = anio || 2027;
+    const colMeta = anio ? `ejercicio_${anio}` : "meta_programada";
 
     const r = await pool.query(`
       WITH lineas AS (
@@ -970,7 +977,7 @@ exports.indicadorConPOT = async (req, res) => {
         GROUP BY l.nomenclatura
       ),
       meta AS (
-        SELECT DISTINCT ON (pt.nomenclatura) pt.nomenclatura, pr.meta_programada
+        SELECT DISTINCT ON (pt.nomenclatura) pt.nomenclatura, pr.${colMeta} AS meta
         FROM pot_registros pr
         JOIN planning_templates pt ON pt.id = pr.planning_template_id
         WHERE pt.nomenclatura IN (SELECT nomenclatura FROM lineas)
@@ -978,7 +985,7 @@ exports.indicadorConPOT = async (req, res) => {
       )
       SELECT DISTINCT ON (l.nomenclatura)
              l.nomenclatura, l.lineas_accion, l.unidad_medida,
-             COALESCE(m.meta_programada,0) AS meta_pot,
+             COALESCE(m.meta,0) AS meta_pot,
              e.ejecutado
       FROM lineas l
       JOIN ejec e ON e.nomenclatura = l.nomenclatura
@@ -998,7 +1005,8 @@ exports.indicadorConPOT = async (req, res) => {
     const pct = sumaMeta > 0 ? Math.round(sumaEjec / sumaMeta * 10000) / 100 : null;
 
     res.json({
-      strategy_id, dependency_id, anio_inicio: anioIni, anio_fin: anioFin,
+      strategy_id, dependency_id,
+      periodo: anio ? String(anio) : "2025-2027",
       suma_ejecutado: sumaEjec,
       suma_meta_pot: sumaMeta,
       pct_indicador: pct,
