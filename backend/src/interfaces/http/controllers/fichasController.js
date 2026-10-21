@@ -835,3 +835,116 @@ const getSemaforoFicha = (pct) => {
   if (p >= 50) return { color:"#f59e0b", bg:"#fffbeb", label:"Regular", emoji:"🟠" }
   return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",    emoji:"🔴" }
 }
+
+
+exports.indicadorConPOT = async (req, res) => {
+  try {
+    const { strategy_id, dependency_id } = req.params
+    const anio_inicio = parseInt(req.query.anio_inicio) || 2025
+    const anio_fin    = parseInt(req.query.anio_fin)    || 2027
+
+    const lineasRes = await pool.query(`
+      SELECT pt.id, pt.nomenclatura, pt.lineas_accion, pt.unidad_medida
+      FROM planning_templates pt
+      WHERE pt.strategy_id   = $1
+        AND pt.dependency_id = $2
+      ORDER BY pt.nomenclatura
+    `, [strategy_id, dependency_id])
+
+    if (!lineasRes.rows.length) {
+      return res.status(400).json({ error: "Sin líneas de acción para esta estrategia" })
+    }
+
+    const lineasIds = lineasRes.rows.map(l => l.id)
+
+    const ejecRes = await pool.query(`
+      SELECT planning_id,
+        COALESCE(SUM(valor), 0) AS ejecutado_acum
+      FROM planning_trimestres
+      WHERE planning_id = ANY($1)
+        AND tipo = 'ejecutado'
+        AND anio BETWEEN $2 AND $3
+      GROUP BY planning_id
+    `, [lineasIds, anio_inicio, anio_fin])
+
+    const progRes = await pool.query(`
+      SELECT planning_id,
+        COALESCE(SUM(valor), 0) AS programado_acum
+      FROM planning_trimestres
+      WHERE planning_id = ANY($1)
+        AND tipo = 'programado'
+        AND anio BETWEEN $2 AND $3
+      GROUP BY planning_id
+    `, [lineasIds, anio_inicio, anio_fin])
+
+    const potRes = await pool.query(`
+      SELECT numero_registro::text AS nomenclatura,
+             meta_programada
+      FROM pot_registros
+      WHERE numero_registro::text = ANY($1)
+    `, [lineasRes.rows.map(l => l.nomenclatura)])
+
+    const mapaEjec = {}
+    ejecRes.rows.forEach(r => { mapaEjec[r.planning_id] = Number(r.ejecutado_acum) })
+
+    const mapaProg = {}
+    progRes.rows.forEach(r => { mapaProg[r.planning_id] = Number(r.programado_acum) })
+
+    const mapaPOT = {}
+    potRes.rows.forEach(r => { mapaPOT[r.nomenclatura] = Number(r.meta_programada) })
+
+    let sumaEjecutado  = 0
+    let sumaMetaPOT    = 0
+
+    const lineas = lineasRes.rows.map(l => {
+      const ejecutado   = mapaEjec[l.id]  || 0
+      const programado  = mapaProg[l.id]  || 0
+      const meta_pot    = mapaPOT[l.nomenclatura] || 0
+
+      sumaEjecutado += ejecutado
+      sumaMetaPOT   += meta_pot
+
+      const pct_vs_pot = meta_pot > 0
+        ? Math.round((ejecutado / meta_pot) * 10000) / 100
+        : 0
+
+      const pct_vs_prog = programado > 0
+        ? Math.round((ejecutado / programado) * 10000) / 100
+        : 0
+
+      return {
+        planning_id:   l.id,
+        nomenclatura:  l.nomenclatura,
+        lineas_accion: l.lineas_accion,
+        unidad_medida: l.unidad_medida,
+        meta_pot,
+        ejecutado,
+        programado,
+        pct_vs_pot,
+        pct_vs_prog,
+        semaforo: getSemaforoFicha(pct_vs_pot)
+      }
+    })
+
+    
+    const pct_indicador = sumaMetaPOT > 0
+      ? Math.round((sumaEjecutado / sumaMetaPOT) * 10000) / 100
+      : 0
+
+    res.json({
+      strategy_id,
+      dependency_id,
+      anio_inicio,
+      anio_fin,
+      formula: "Σ Ejecutado todas las líneas / Σ Meta trianual POT × 100",
+      suma_ejecutado:   Math.round(sumaEjecutado * 100) / 100,
+      suma_meta_pot:    Math.round(sumaMetaPOT   * 100) / 100,
+      pct_indicador,
+      semaforo: getSemaforoFicha(pct_indicador),
+      lineas
+    })
+  } catch(e) {
+    console.error("Error indicador con POT:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
