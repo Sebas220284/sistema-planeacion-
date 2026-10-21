@@ -4,6 +4,7 @@ const ctrl    = require("../controllers/potController")
 
 router.get("/",                     ctrl.listar)
 router.get("/resumen",              ctrl.resumen)
+router.post("/metas",               ctrl.metasPorLineas)
 router.get("/dependencia/:dep_id",  ctrl.porDependencia)
 router.get("/:id",                  ctrl.obtener)
 router.put("/:id",                  ctrl.actualizar)
