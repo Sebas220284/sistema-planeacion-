@@ -33,7 +33,7 @@ const limpiar = (body) => {
 }
 
 const n = (v) => (v === "" || v === null || v === undefined) ? 0 : (Number(v) || 0);
-const round2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
+const round2 = (v) => { const num = n(v); return Math.round((num + Math.sign(num) * 1e-9) * 100) / 100; };
 
 
 // CATÁLOGOS
@@ -41,8 +41,7 @@ const round2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
 exports.getCatProgramas = async (req, res) => {
   try {
     const r = await pool.query(`SELECT * FROM cat_programas ORDER BY clave`)
-    const rows = r.rows.map(d => ({ ...d, importe_sin_iva: round2(d.importe_sin_iva), importe_con_iva: round2(d.importe_con_iva) }));
-    res.json(rows)
+    res.json(r.rows)
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
@@ -339,7 +338,8 @@ exports.getDesglose = async (req, res) => {
       `SELECT * FROM cip_desglose_presupuesto WHERE proyecto_id=$1 ORDER BY orden`,
       [req.params.id]
     )
-    res.json(r.rows)
+    const rows = r.rows.map(d => ({ ...d, importe_sin_iva: round2(d.importe_sin_iva), importe_con_iva: round2(d.importe_con_iva) }))
+    res.json(rows)
   } catch(e) { res.status(500).json({ error: e.message }) }
 }
 
@@ -359,7 +359,17 @@ exports.agregarDesglose = async (req, res) => {
       req.body.tiene_iva !== false,
       n(req.body.orden)
     ])
-    res.json(r.rows[0])
+    await pool.query(`
+      UPDATE cip_proyectos
+      SET costo_total = COALESCE((
+        SELECT SUM(ROUND(importe_con_iva, 2))
+        FROM cip_desglose_presupuesto
+        WHERE proyecto_id = $1
+      ), 0)
+      WHERE id = $1
+    `, [req.params.id])
+    const row = r.rows[0] ? { ...r.rows[0], importe_sin_iva: round2(r.rows[0].importe_sin_iva), importe_con_iva: round2(r.rows[0].importe_con_iva) } : r.rows[0]
+    res.json(row)
   } catch(e) {
     console.error("Error agregar desglose:", e)
     res.status(500).json({ error: e.message })
@@ -378,11 +388,12 @@ exports.actualizarDesglose = async (req, res) => {
       req.body.partida_desc  || null,
       req.body.grupo_nombre  || null,
       req.body.descripcion   || null,
-      n(req.body.importe_sin_iva),
+      round2(req.body.importe_sin_iva),
       req.body.tiene_iva !== false,
       req.params.did
     ])
-    res.json(r.rows[0])
+    const row = r.rows[0] ? { ...r.rows[0], importe_sin_iva: round2(r.rows[0].importe_sin_iva), importe_con_iva: round2(r.rows[0].importe_con_iva) } : r.rows[0]
+    res.json(row)
   } catch(e) {
     console.error("Error actualizar desglose:", e)
     res.status(500).json({ error: e.message })
@@ -391,7 +402,20 @@ exports.actualizarDesglose = async (req, res) => {
 
 exports.eliminarDesglose = async (req, res) => {
   try {
+    const found = await pool.query(`SELECT proyecto_id FROM cip_desglose_presupuesto WHERE id=$1`, [req.params.did])
+    const proyectoId = found.rows[0]?.proyecto_id
     await pool.query(`DELETE FROM cip_desglose_presupuesto WHERE id=$1`, [req.params.did])
+    if (proyectoId) {
+      await pool.query(`
+        UPDATE cip_proyectos
+        SET costo_total = COALESCE((
+          SELECT SUM(ROUND(importe_con_iva, 2))
+          FROM cip_desglose_presupuesto
+          WHERE proyecto_id = $1
+        ), 0)
+        WHERE id = $1
+      `, [proyectoId])
+    }
     res.json({ ok: true })
   } catch(e) { res.status(500).json({ error: e.message }) }
 }

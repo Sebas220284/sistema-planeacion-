@@ -1,5 +1,67 @@
 const pool = require("../../../database/postgres")
 
+// ─────────────────────────────────────────────────────────────
+// Metas del POG (POT) por año.
+// pot_registros guarda la meta trianual repartida en columnas fijas
+// por ejercicio, así que el año se traduce aquí a su columna.
+// ─────────────────────────────────────────────────────────────
+const COLUMNAS_EJERCICIO = {
+  2025: "ejercicio_2025",
+  2026: "ejercicio_2026",
+  2027: "ejercicio_2027",
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_LINEAS_POR_PETICION = 1000
+
+// POST /api/pot/metas  body: { anio, ids: [planning_template_id] }
+// Responde { anio, metas: { [planning_template_id]: { meta_pog, meta_programada, registros } } }.
+// Una línea puede tener varios registros en el POT: se suman.
+// Las líneas sin registro simplemente no aparecen en el objeto.
+exports.metasPorLineas = async (req, res) => {
+  try {
+    const anio = parseInt(req.body && req.body.anio)
+    const columna = COLUMNAS_EJERCICIO[anio]
+    if (!columna) {
+      return res.status(400).json({
+        error: `El año ${req.body && req.body.anio} no tiene programación en el POT`,
+        anios_disponibles: Object.keys(COLUMNAS_EJERCICIO).map(Number)
+      })
+    }
+
+    const ids = req.body && req.body.ids
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_LINEAS_POR_PETICION ||
+        !ids.every(id => typeof id === "string" && UUID_RE.test(id))) {
+      return res.status(400).json({ error: `ids debe ser un arreglo de hasta ${MAX_LINEAS_POR_PETICION} UUID` })
+    }
+
+    const unicos = [...new Set(ids.map(id => id.toLowerCase()))]
+
+    const r = await pool.query(`
+      SELECT planning_template_id, numero_registro, meta_programada,
+             ${columna} AS meta_pog
+      FROM pot_registros
+      WHERE planning_template_id = ANY($1::uuid[])
+      ORDER BY numero_registro
+    `, [unicos])
+
+    const metas = {}
+    r.rows.forEach(row => {
+      const k = row.planning_template_id
+      if (!metas[k]) metas[k] = { meta_pog: 0, meta_programada: 0, registros: [] }
+      metas[k].meta_pog        += Number(row.meta_pog || 0)
+      metas[k].meta_programada += Number(row.meta_programada || 0)
+      metas[k].registros.push(row.numero_registro)
+    })
+
+    res.json({ anio, columna, metas })
+  } catch(e) {
+    console.error("Error metas POG:", e)
+    res.status(500).json({ error: e.message })
+  }
+}
+
+
 exports.listar = async (req, res) => {
   try {
     const pagina  = parseInt(req.query.pagina)  || 1
