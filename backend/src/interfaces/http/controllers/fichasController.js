@@ -948,3 +948,66 @@ exports.indicadorConPOT = async (req, res) => {
     res.status(500).json({ error: e.message })
   }
 }
+
+exports.indicadorConPOT = async (req, res) => {
+  try {
+    const { strategy_id, dependency_id } = req.params;
+    const anioIni = parseInt(req.query.anio_inicio) || 2025;
+    const anioFin = parseInt(req.query.anio_fin) || 2027;
+
+    const r = await pool.query(`
+      WITH lineas AS (
+        SELECT id, nomenclatura, lineas_accion, unidad_medida
+        FROM planning_templates
+        WHERE strategy_id = $1 AND dependency_id = $2
+      ),
+      ejec AS (
+        SELECT l.nomenclatura, COALESCE(SUM(tr.valor),0) AS ejecutado
+        FROM lineas l
+        LEFT JOIN planning_trimestres tr
+          ON tr.planning_id = l.id AND tr.tipo = 'ejecutado'
+         AND tr.anio BETWEEN $3 AND $4
+        GROUP BY l.nomenclatura
+      ),
+      meta AS (
+        SELECT DISTINCT ON (pt.nomenclatura) pt.nomenclatura, pr.meta_programada
+        FROM pot_registros pr
+        JOIN planning_templates pt ON pt.id = pr.planning_template_id
+        WHERE pt.nomenclatura IN (SELECT nomenclatura FROM lineas)
+        ORDER BY pt.nomenclatura
+      )
+      SELECT DISTINCT ON (l.nomenclatura)
+             l.nomenclatura, l.lineas_accion, l.unidad_medida,
+             COALESCE(m.meta_programada,0) AS meta_pot,
+             e.ejecutado
+      FROM lineas l
+      JOIN ejec e ON e.nomenclatura = l.nomenclatura
+      LEFT JOIN meta m ON m.nomenclatura = l.nomenclatura
+      ORDER BY l.nomenclatura
+    `, [strategy_id, dependency_id, anioIni, anioFin]);
+
+    const detalle = r.rows.map(x => ({
+      ...x,
+      meta_pot: Number(x.meta_pot),
+      ejecutado: Number(x.ejecutado),
+      pct_linea: Number(x.meta_pot) > 0
+        ? Math.round(Number(x.ejecutado) / Number(x.meta_pot) * 10000) / 100 : null
+    }));
+    const sumaMeta = detalle.reduce((a, x) => a + x.meta_pot, 0);
+    const sumaEjec = detalle.reduce((a, x) => a + x.ejecutado, 0);
+    const pct = sumaMeta > 0 ? Math.round(sumaEjec / sumaMeta * 10000) / 100 : null;
+
+    res.json({
+      strategy_id, dependency_id, anio_inicio: anioIni, anio_fin: anioFin,
+      suma_ejecutado: sumaEjec,
+      suma_meta_pot: sumaMeta,
+      pct_indicador: pct,
+      semaforo: pct === null ? null : getSemaforoFicha(pct),
+      lineas_sin_meta_pot: detalle.filter(x => x.meta_pot === 0).length,
+      detalle
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Error al calcular indicador" });
+  }
+};

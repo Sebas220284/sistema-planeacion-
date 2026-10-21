@@ -15,4 +15,6 @@ router.get("/lista-con-poa",controller.listaConPOA)
 router.get("/ponderacion-estrategia/:dependency_id",controller.ponderacionPorEstrategia)
 router.get("/datos-estrategia/:strategy_id/:dependency_id", controller.datosEstrategiaParaFicha)
 router.get("/estrategias/:dependency_id", controller.estrategiasPorDependencia)
+router.get("/indicador-pot/:strategy_id/:dependency_id", controller.indicadorConPOT)
+
 module.exports = router 
