@@ -37,6 +37,9 @@ const justificantesRoutes = require("./interfaces/http/routes/justificantesRoute
 const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesRoutes")
 const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
+const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
+
+
 
 
 const app = express()
@@ -169,6 +172,7 @@ app.use("/api/reportes/seguimiento", segReportesRoutes)
 app.use("/api/poa-llenado", poaLlenadoRoutes)
 app.use("/api/estrategica", estrategicaRoutes)
 app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
+app.use("/api/indicadores", indicadoresRoutes)
 
 io.on("connection", (socket) => {
 

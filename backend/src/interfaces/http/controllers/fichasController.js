@@ -22,8 +22,33 @@ const CAMPOS_HIST = [
   "criterio_adecuado","criterio_aportacion","calendarizacion"
 ]
 
+// Indicador del catálogo (estrategia_indicadores) para una estrategia
+async function indicadorDeEstrategia(strategy_id) {
+  if (!strategy_id) return null
+  const r = await pool.query(
+    `SELECT indicador FROM v_estrategia_indicador
+     WHERE strategy_id = $1 AND indicador IS NOT NULL LIMIT 1`,
+    [strategy_id]
+  )
+  return r.rows[0]?.indicador || null
+}
+
+async function completarIndicador(body) {
+  if (body.nombre_indicador && String(body.nombre_indicador).trim()) return
+  const r = await pool.query(`
+    SELECT indicador FROM v_estrategia_indicador
+    WHERE indicador IS NOT NULL
+      AND ( strategy_id = $1::uuid
+         OR clave = substring($2::text FROM '^Estrategia\\s+(\\d+(?:\\.\\d+)+)') )
+    ORDER BY (strategy_id = $1::uuid) DESC NULLS LAST
+    LIMIT 1
+  `, [body.strategy_id || null, body.estrategia || ""])
+  if (r.rows[0]?.indicador) body.nombre_indicador = r.rows[0].indicador
+}
+
 exports.crear = async (req, res) => {
   try {
+    await completarIndicador(req.body)
     const vals = CAMPOS.map(c => (req.body[c] === "" ? null : (req.body[c] ?? null)))
     const cols = CAMPOS.join(",")
     const params = CAMPOS.map((_,i) => `$${i+1}`).join(",")
@@ -78,6 +103,7 @@ exports.porDependencia = async (req, res) => {
 
 exports.actualizar = async (req, res) => {
   try {
+    await completarIndicador(req.body)
     const { id } = req.params
     const { comentario_cambio, modificado_por } = req.body
 
@@ -246,7 +272,7 @@ exports.datosParaFicha = async (req, res) => {
     })
 
     res.json({
-      nombre_indicador:   l.lineas_accion || l.nombre2 || "",
+      nombre_indicador:   (await indicadorDeEstrategia(l.strategy_id)) || l.lineas_accion || l.nombre2 || "",
       definicion:         l.lineas_accion || "",
       proposito:          l.pmd_objetivo  || "",
       formula:            `(Número de ${l.unidad_medida || "acciones"} realizadas / Número de ${l.unidad_medida || "acciones"} programadas) * 100`,
@@ -374,7 +400,7 @@ exports.datosParaEstrategia = async (req, res) => {
     });
 
     res.json({
-      nombre_indicador:   est.strategy_nombre || est.lineas_accion || "",
+      nombre_indicador:   (await indicadorDeEstrategia(est.strategy_id)) || est.strategy_nombre || est.lineas_accion || "",
       definicion:         est.strategy_nombre || est.lineas_accion || "",
       proposito:          est.pmd_objetivo  || "",
       formula:            est.unidad_medida ? `(Número de ${est.unidad_medida} realizadas / Número de ${est.unidad_medida} programadas) * 100` : "",
@@ -739,7 +765,7 @@ exports.datosEstrategiaParaFicha = async (req, res) => {
     const primeraLinea = lineasRes.rows[0] || {}
 
     res.json({
-      nombre_indicador:    `Indicador de cumplimiento: ${estrategia.name}`,
+      nombre_indicador:    (await indicadorDeEstrategia(strategy_id)) || `Indicador de cumplimiento: ${estrategia.name}`,
       definicion:          primeraLinea.pmd_objetivo || estrategia.name,
       proposito:           `Medir el avance de la estrategia "${estrategia.name}" durante el período ${anio_inicio}-${anio_fin}`,
       formula:             `(Suma ejecutado trianual / Suma programado trianual) × 100`,
@@ -839,118 +865,6 @@ const getSemaforoFicha = (pct) => {
 
 exports.indicadorConPOT = async (req, res) => {
   try {
-    const { strategy_id, dependency_id } = req.params
-    const anio_inicio = parseInt(req.query.anio_inicio) || 2025
-    const anio_fin    = parseInt(req.query.anio_fin)    || 2027
-
-    const lineasRes = await pool.query(`
-      SELECT pt.id, pt.nomenclatura, pt.lineas_accion, pt.unidad_medida
-      FROM planning_templates pt
-      WHERE pt.strategy_id   = $1
-        AND pt.dependency_id = $2
-      ORDER BY pt.nomenclatura
-    `, [strategy_id, dependency_id])
-
-    if (!lineasRes.rows.length) {
-      return res.status(400).json({ error: "Sin líneas de acción para esta estrategia" })
-    }
-
-    const lineasIds = lineasRes.rows.map(l => l.id)
-
-    const ejecRes = await pool.query(`
-      SELECT planning_id,
-        COALESCE(SUM(valor), 0) AS ejecutado_acum
-      FROM planning_trimestres
-      WHERE planning_id = ANY($1)
-        AND tipo = 'ejecutado'
-        AND anio BETWEEN $2 AND $3
-      GROUP BY planning_id
-    `, [lineasIds, anio_inicio, anio_fin])
-
-    const progRes = await pool.query(`
-      SELECT planning_id,
-        COALESCE(SUM(valor), 0) AS programado_acum
-      FROM planning_trimestres
-      WHERE planning_id = ANY($1)
-        AND tipo = 'programado'
-        AND anio BETWEEN $2 AND $3
-      GROUP BY planning_id
-    `, [lineasIds, anio_inicio, anio_fin])
-
-    const potRes = await pool.query(`
-      SELECT numero_registro::text AS nomenclatura,
-             meta_programada
-      FROM pot_registros
-      WHERE numero_registro::text = ANY($1)
-    `, [lineasRes.rows.map(l => l.nomenclatura)])
-
-    const mapaEjec = {}
-    ejecRes.rows.forEach(r => { mapaEjec[r.planning_id] = Number(r.ejecutado_acum) })
-
-    const mapaProg = {}
-    progRes.rows.forEach(r => { mapaProg[r.planning_id] = Number(r.programado_acum) })
-
-    const mapaPOT = {}
-    potRes.rows.forEach(r => { mapaPOT[r.nomenclatura] = Number(r.meta_programada) })
-
-    let sumaEjecutado  = 0
-    let sumaMetaPOT    = 0
-
-    const lineas = lineasRes.rows.map(l => {
-      const ejecutado   = mapaEjec[l.id]  || 0
-      const programado  = mapaProg[l.id]  || 0
-      const meta_pot    = mapaPOT[l.nomenclatura] || 0
-
-      sumaEjecutado += ejecutado
-      sumaMetaPOT   += meta_pot
-
-      const pct_vs_pot = meta_pot > 0
-        ? Math.round((ejecutado / meta_pot) * 10000) / 100
-        : 0
-
-      const pct_vs_prog = programado > 0
-        ? Math.round((ejecutado / programado) * 10000) / 100
-        : 0
-
-      return {
-        planning_id:   l.id,
-        nomenclatura:  l.nomenclatura,
-        lineas_accion: l.lineas_accion,
-        unidad_medida: l.unidad_medida,
-        meta_pot,
-        ejecutado,
-        programado,
-        pct_vs_pot,
-        pct_vs_prog,
-        semaforo: getSemaforoFicha(pct_vs_pot)
-      }
-    })
-
-    
-    const pct_indicador = sumaMetaPOT > 0
-      ? Math.round((sumaEjecutado / sumaMetaPOT) * 10000) / 100
-      : 0
-
-    res.json({
-      strategy_id,
-      dependency_id,
-      anio_inicio,
-      anio_fin,
-      formula: "Σ Ejecutado todas las líneas / Σ Meta trianual POT × 100",
-      suma_ejecutado:   Math.round(sumaEjecutado * 100) / 100,
-      suma_meta_pot:    Math.round(sumaMetaPOT   * 100) / 100,
-      pct_indicador,
-      semaforo: getSemaforoFicha(pct_indicador),
-      lineas
-    })
-  } catch(e) {
-    console.error("Error indicador con POT:", e)
-    res.status(500).json({ error: e.message })
-  }
-}
-
-exports.indicadorConPOT = async (req, res) => {
-  try {
     const { strategy_id, dependency_id } = req.params;
     const anio = req.query.anio ? parseInt(req.query.anio) : null;  
 
@@ -1004,8 +918,11 @@ exports.indicadorConPOT = async (req, res) => {
     const sumaEjec = detalle.reduce((a, x) => a + x.ejecutado, 0);
     const pct = sumaMeta > 0 ? Math.round(sumaEjec / sumaMeta * 10000) / 100 : null;
 
+    const indicador_nombre = await indicadorDeEstrategia(strategy_id);
+
     res.json({
       strategy_id, dependency_id,
+      indicador_nombre,
       periodo: anio ? String(anio) : "2025-2027",
       suma_ejecutado: sumaEjec,
       suma_meta_pot: sumaMeta,
