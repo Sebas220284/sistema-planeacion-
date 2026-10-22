@@ -22,7 +22,6 @@ const CAMPOS_HIST = [
   "criterio_adecuado","criterio_aportacion","calendarizacion"
 ]
 
-// Indicador del catálogo (estrategia_indicadores) para una estrategia
 async function indicadorDeEstrategia(strategy_id) {
   if (!strategy_id) return null
   const r = await pool.query(
