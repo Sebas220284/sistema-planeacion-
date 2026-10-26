@@ -18,10 +18,20 @@ exports.listar = async (req, res) => {
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""
 
     const r = await pool.query(`
-      SELECT strategy_id, estrategia, clave, split_part(clave, '.', 1) AS eje_num, indicador, requiere_revision, nota
+      SELECT
+        strategy_id,
+        estrategia,
+        clave,
+        split_part(clave, '.', 1) AS eje_num,
+        indicador,
+        requiere_revision,
+        nota,
+        (SELECT COUNT(*)::int FROM planning_templates pt WHERE pt.strategy_id = v_estrategia_indicador.strategy_id) AS num_lineas
       FROM v_estrategia_indicador
       ${whereClause}
-      ORDER BY string_to_array(clave, '.')::int[]
+      ORDER BY
+        string_to_array(clave, '.')::int[],
+        (SELECT COUNT(*) FROM planning_templates pt WHERE pt.strategy_id = v_estrategia_indicador.strategy_id) DESC
     `, params)
     res.json(r.rows)
   } catch (e) {

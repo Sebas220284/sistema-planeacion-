@@ -1,11 +1,11 @@
 const pool = require("../../../database/postgres")
 
 const SEM = {
-  optimo:    { color:"#16a34a", bg:"#d1fae5",  label:"Óptimo",   pct:"≥ 90%" },
-  bueno:     { color:"#d97706", bg:"#fef3c7",  label:"Bueno",    pct:"70-89%" },
-  regular:   { color:"#ea580c", bg:"#ffedd5", label:"Regular",  pct:"50-69%" },
-  bajo:      { color:"#dc2626", bg:"#fee2e2",  label:"Bajo",     pct:"< 50%"  },
-  sin_datos: { color:"#6b7280", bg:"#f3f4f6",  label:"Sin datos", pct:"—"     },
+  optimo:    { color:"#16a34a", bg:"#d1fae5",  label:"Óptimo",   pct:"> 80% = < 100%" },
+  regular:   { color:"#d97706", bg:"#fef3c7",  label:"Regular",  pct:"> 60% = < 79.99%" },
+  bueno:     { color:"#d97706", bg:"#fef3c7",  label:"Regular",  pct:"> 60% = < 79.99%" },
+  bajo:      { color:"#dc2626", bg:"#fee2e2",  label:"Bajo",     pct:"> 0.01% = < 59.99%" },
+  sin_datos: { color:"#6b7280", bg:"#f3f4f6",  label:"Sin datos", pct:"—" },
 }
 
 const fmt = (n) =>
@@ -98,9 +98,8 @@ exports.reporteTrimestral = async (req, res) => {
         ,2) AS cumplimiento_trimestre,
         CASE
           WHEN prog_t${t} = 0 THEN 'sin_datos'
-          WHEN ejec_t${t}/NULLIF(prog_t${t},0)*100 >= 90 THEN 'optimo'
-          WHEN ejec_t${t}/NULLIF(prog_t${t},0)*100 >= 70 THEN 'bueno'
-          WHEN ejec_t${t}/NULLIF(prog_t${t},0)*100 >= 50 THEN 'regular'
+          WHEN ejec_t${t}/NULLIF(prog_t${t},0)*100 >= 80 THEN 'optimo'
+          WHEN ejec_t${t}/NULLIF(prog_t${t},0)*100 >= 60 THEN 'regular'
           ELSE 'bajo'
         END AS semaforo_trimestre
       FROM v_seguimiento_lineas

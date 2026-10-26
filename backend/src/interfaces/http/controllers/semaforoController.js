@@ -1,9 +1,9 @@
 const pool = require("../../../database/postgres")
 
 const SEMAFORO_INFO = {
-  optimo:    { color:"#16a34a", bg:"#d1fae5", emoji:"🟢", label:"Óptimo",    min:90  },
-  bueno:     { color:"#d97706", bg:"#fef3c7", emoji:"🟡", label:"Bueno",     min:70  },
-  regular:   { color:"#ea580c", bg:"#ffedd5", emoji:"🟠", label:"Regular",   min:50  },
+  optimo:    { color:"#16a34a", bg:"#d1fae5", emoji:"🟢", label:"Óptimo",    min:80  },
+  regular:   { color:"#d97706", bg:"#fef3c7", emoji:"🟡", label:"Regular",   min:60  },
+  bueno:     { color:"#d97706", bg:"#fef3c7", emoji:"🟡", label:"Regular",   min:60  },
   bajo:      { color:"#dc2626", bg:"#fee2e2", emoji:"🔴", label:"Bajo",      min:0   },
   sin_datos: { color:"#6b7280", bg:"#f3f4f6", emoji:"⚪", label:"Sin datos", min:null},
 }
@@ -227,9 +227,8 @@ exports.getResumenEjes = async (req, res) => {
         COALESCE(se.cumplimiento_global, 0) AS cumplimiento_global,
         CASE
           WHEN COALESCE(se.total_lineas, 0) = 0 THEN 'sin_datos'
-          WHEN COALESCE(se.cumplimiento_global, 0) >= 90 THEN 'optimo'
-          WHEN COALESCE(se.cumplimiento_global, 0) >= 70 THEN 'bueno'
-          WHEN COALESCE(se.cumplimiento_global, 0) >= 50 THEN 'regular'
+          WHEN COALESCE(se.cumplimiento_global, 0) >= 80 THEN 'optimo'
+          WHEN COALESCE(se.cumplimiento_global, 0) >= 60 THEN 'regular'
           ELSE 'bajo'
         END AS semaforo_global
       FROM pmd_ejes pe
@@ -348,9 +347,8 @@ exports.getDetalleEje = async (req, res) => {
       ? Math.round((lineasEnriquecidas.reduce((s, l) => s + Number(l.porcentaje_cumplimiento || 0), 0) / totalLineasEje) * 100) / 100
       : 0
     const semaforoEje = totalLineasEje === 0 ? "sin_datos"
-      : cumplimientoGlobalEje >= 90 ? "optimo"
-      : cumplimientoGlobalEje >= 70 ? "bueno"
-      : cumplimientoGlobalEje >= 50 ? "regular" : "bajo"
+      : cumplimientoGlobalEje >= 80 ? "optimo"
+      : cumplimientoGlobalEje >= 60 ? "regular" : "bajo"
 
     res.json({
       anio,
