@@ -104,6 +104,19 @@ ioTransporte.on('connection', (socket) => {
         ioTransporte.emit('bus_moviéndose', coords);
     });
 });
+
+// Mitigación vulnerabilidad Brotli de Node (zlib, octubre 2026):
+app.use((req, res, next) => {
+  const encodings = String(req.headers["content-encoding"] || "")
+    .toLowerCase()
+    .split(",")
+    .map((e) => e.trim())
+  if (encodings.includes("br")) {
+    return res.status(415).json({ error: "Content-Encoding no soportado" })
+  }
+  next()
+})
+
 app.use(express.json({ limit: '10mb' }))
 async function checkDatabase(){
 
