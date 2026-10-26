@@ -9,6 +9,8 @@ function soloPlaneacion(req, res, next) {
 }
 
 router.get("/", controller.listar)
+router.get("/ejes", controller.ejes)
+router.get("/por-eje/:eje", controller.porEje)
 router.get("/por-estrategia/:strategy_id", controller.porEstrategia)
 router.put("/:clave", soloPlaneacion, controller.actualizar)
 

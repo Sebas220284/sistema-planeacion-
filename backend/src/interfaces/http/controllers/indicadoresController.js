@@ -3,16 +3,67 @@ const pool = require("../../../database/postgres")
 exports.listar = async (req, res) => {
   try {
     const soloPend = req.query.pendientes === "1"
+    const eje = req.query.eje ? String(req.query.eje).trim().split(".")[0] : null
+    const conditions = []
+    const params = []
+
+    if (soloPend) {
+      conditions.push("(requiere_revision = TRUE OR indicador IS NULL)")
+    }
+    if (eje) {
+      params.push(eje)
+      conditions.push(`split_part(clave, '.', 1) = $${params.length}`)
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""
+
     const r = await pool.query(`
-      SELECT strategy_id, estrategia, clave, indicador, requiere_revision, nota
+      SELECT strategy_id, estrategia, clave, split_part(clave, '.', 1) AS eje_num, indicador, requiere_revision, nota
       FROM v_estrategia_indicador
-      ${soloPend ? "WHERE requiere_revision = TRUE OR indicador IS NULL" : ""}
+      ${whereClause}
       ORDER BY string_to_array(clave, '.')::int[]
-    `)
+    `, params)
     res.json(r.rows)
   } catch (e) {
     console.error(e)
     res.status(500).json({ error: "Error al listar indicadores" })
+  }
+}
+
+exports.ejes = async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT DISTINCT
+        split_part(ei.clave, '.', 1) AS eje_num,
+        COALESCE(pe.nombre, 'Eje ' || split_part(ei.clave, '.', 1)) AS nombre,
+        COUNT(ei.id)::int AS total_indicadores
+      FROM estrategia_indicadores ei
+      LEFT JOIN pmd_ejes pe ON pe.id::text = split_part(ei.clave, '.', 1)
+      WHERE ei.clave IS NOT NULL
+      GROUP BY split_part(ei.clave, '.', 1), pe.nombre
+      ORDER BY split_part(ei.clave, '.', 1)::int
+    `)
+    res.json(r.rows)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: "Error al listar ejes de indicadores" })
+  }
+}
+
+exports.porEje = async (req, res) => {
+  try {
+    const ejeNum = String(req.params.eje || "").trim().split(".")[0]
+    const r = await pool.query(`
+      SELECT id, clave, split_part(clave, '.', 1) AS eje_num, indicador, requiere_revision, nota
+      FROM estrategia_indicadores
+      WHERE split_part(clave, '.', 1) = $1
+        AND indicador IS NOT NULL
+      ORDER BY string_to_array(clave, '.')::int[]
+    `, [ejeNum])
+    res.json(r.rows)
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: "Error al listar indicadores por eje" })
   }
 }
 
