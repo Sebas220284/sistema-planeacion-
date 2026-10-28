@@ -213,8 +213,7 @@ exports.getResumenGlobal = async (req, res) => {
 
 const getSemaforo = (porcentaje) => {
   const p = Number(porcentaje)
-  if (p >= 90) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",     emoji:"🟢", nivel:4 }
-  if (p >= 70) return { color:"#d97706", bg:"#fef3c7", label:"Bueno",      emoji:"🟡", nivel:3 }
-  if (p >= 50) return { color:"#f59e0b", bg:"#fffbeb", label:"Regular",    emoji:"🟠", nivel:2 }
-  return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",       emoji:"🔴", nivel:1 }
+  if (p >= 80) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢", nivel:3 }
+  if (p >= 60) return { color:"#d97706", bg:"#fef3c7", label:"Regular", emoji:"🟡", nivel:2 }
+  return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",    emoji:"🔴", nivel:1 }
 }

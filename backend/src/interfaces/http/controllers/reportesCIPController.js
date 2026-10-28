@@ -53,8 +53,12 @@ exports.reporte1 = async (req, res) => {
     }
 
     if (estado && estado !== 'todos') {
-      params.push(estado);
-      c_where += ` AND c.estado = $${params.length}`;
+      if (String(estado).toLowerCase() === 'proyeccion') {
+        c_where += ` AND c.estado IN ('aprobado', 'enviado', 'rechazado')`;
+      } else {
+        params.push(estado);
+        c_where += ` AND c.estado = $${params.length}`;
+      }
     }
 
     if (anio && anio !== 'todos') {
@@ -161,8 +165,12 @@ exports.reporteLineasAccion = async (req, res) => {
       }
     
     if (estado && estado !== 'todos') {
-      params.push(estado);
-      cipWhere += ` AND c.estado = $${params.length}`;
+      if (String(estado).toLowerCase() === 'proyeccion') {
+        cipWhere += ` AND c.estado IN ('aprobado', 'enviado', 'rechazado')`;
+      } else {
+        params.push(estado);
+        cipWhere += ` AND c.estado = $${params.length}`;
+      }
     }
     
     if (anio && anio !== 'todos') {
@@ -225,9 +233,13 @@ exports.reporte2 = async (req, res) => {
       }
     }
 
-    if (estado) {
-      params.push(estado)
-      where += ` AND estado = $${params.length}`
+    if (estado && estado !== 'todos') {
+      if (String(estado).toLowerCase() === 'proyeccion') {
+        where += ` AND estado IN ('aprobado', 'enviado', 'rechazado')`
+      } else {
+        params.push(estado)
+        where += ` AND estado = $${params.length}`
+      }
     }
     if (anio) {
       params.push(Number(anio))
@@ -305,8 +317,12 @@ exports.reporte2 = async (req, res) => {
           }
         }
       if (estado && estado !== 'todos') {
-        calParams.push(estado);
-        cipWhere += ` AND c.estado = $${calParams.length}`;
+        if (String(estado).toLowerCase() === 'proyeccion') {
+          cipWhere += ` AND c.estado IN ('aprobado', 'enviado', 'rechazado')`;
+        } else {
+          calParams.push(estado);
+          cipWhere += ` AND c.estado = $${calParams.length}`;
+        }
       }
       if (anio && anio !== 'todos') {
         calParams.push(Number(anio));
@@ -469,9 +485,13 @@ exports.reportePorEje = async (req, res) => {
       }
     }
 
-    if (estado) {
-      params.push(estado)
-      where += ` AND c.estado = $${params.length}`
+    if (estado && estado !== 'todos') {
+      if (String(estado).toLowerCase() === 'proyeccion') {
+        where += ` AND c.estado IN ('aprobado', 'enviado', 'rechazado')`
+      } else {
+        params.push(estado)
+        where += ` AND c.estado = $${params.length}`
+      }
     }
     if (anio) {
       params.push(Number(anio))
@@ -532,9 +552,13 @@ exports.reportePorPrograma = async (req, res) => {
       paramCount++;
     }
     if (estado && String(estado).toLowerCase() !== 'todos') {
-      pWhere += ` AND p.estado = $${paramCount}`;
-      params.push(estado);
-      paramCount++;
+      if (String(estado).toLowerCase() === 'proyeccion') {
+        pWhere += ` AND p.estado IN ('aprobado', 'enviado', 'rechazado')`;
+      } else {
+        pWhere += ` AND p.estado = $${paramCount}`;
+        params.push(estado);
+        paramCount++;
+      }
     }
 
     const query = `

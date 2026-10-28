@@ -338,6 +338,7 @@ exports.datosParaEstrategia = async (req, res) => {
         d.name as dependencia_nombre,
         d.titular as dependencia_titular,
         d.enlace as dependencia_enlace,
+        COUNT(pt.id)::int as total_lineas,
         MAX(pt.pmd_eje) as pmd_eje,
         MAX(pt.pmd_tema) as pmd_tema,
         MAX(pt.pmd_politica_publica) as pmd_politica_publica,
@@ -350,6 +351,8 @@ exports.datosParaEstrategia = async (req, res) => {
       JOIN dependencies d ON d.id = pt.dependency_id
       WHERE s.id = $1
       GROUP BY s.id, d.id
+      ORDER BY COUNT(pt.id) DESC
+      LIMIT 1
     `, [strategy_id]);
 
     if (!estrategiaQuery.rows[0]) {
@@ -367,6 +370,33 @@ exports.datosParaEstrategia = async (req, res) => {
       ORDER BY trimestre, tipo
     `, [strategy_id, anioNum]);
 
+    const potQuery = await pool.query(`
+      WITH pot_est AS (
+        SELECT
+          COALESCE(SUM(pr.meta_programada), 0)::numeric AS meta_trianual,
+          COALESCE(SUM(pr.ejercicio_2025), 0)::numeric AS prog_2025,
+          COALESCE(SUM(pr.ejercicio_2026), 0)::numeric AS prog_2026,
+          COALESCE(SUM(pr.ejercicio_2027), 0)::numeric AS prog_2027
+        FROM planning_templates pt
+        JOIN pot_registros pr ON pr.planning_template_id = pt.id
+        WHERE pt.strategy_id = $1
+      ),
+      tr_est AS (
+        SELECT
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2025), 0)::numeric AS ejec_2025,
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2026), 0)::numeric AS ejec_2026,
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2027), 0)::numeric AS ejec_2027,
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2025), 0)::numeric AS tr_prog_2025,
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2026), 0)::numeric AS tr_prog_2026,
+          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2027), 0)::numeric AS tr_prog_2027
+        FROM planning_templates pt
+        LEFT JOIN planning_trimestres tr ON tr.planning_id = pt.id
+        WHERE pt.strategy_id = $1
+      )
+      SELECT * FROM pot_est CROSS JOIN tr_est
+    `, [strategy_id]);
+
+    const potRow = potQuery.rows[0] || {};
     const datosT = { programado:{1:0,2:0,3:0,4:0}, ejecutado:{1:0,2:0,3:0,4:0} };
     trimestres.rows.forEach(t => {
       if (datosT[t.tipo] && t.trimestre >= 1 && t.trimestre <= 4) {
@@ -376,7 +406,62 @@ exports.datosParaEstrategia = async (req, res) => {
 
     const totalProgramado = Object.values(datosT.programado).reduce((s,v)=>s+v, 0);
     const totalEjecutado  = Object.values(datosT.ejecutado ).reduce((s,v)=>s+v, 0);
-    const valorInicial    = datosT.programado[1] || 0;
+    const valorInicialRaw = datosT.programado[1] || 0;
+
+    const potProg2025 = Number(potRow.prog_2025 || 0) || Number(potRow.tr_prog_2025 || 0);
+    const potProg2026 = Number(potRow.prog_2026 || 0) || Number(potRow.tr_prog_2026 || 0);
+    const potProg2027 = Number(potRow.prog_2027 || 0) || Number(potRow.tr_prog_2027 || 0);
+    const suma3AniosPot = potProg2025 + potProg2026 + potProg2027;
+    const potMetaTrianual = Number(potRow.meta_trianual || 0) > 0
+      ? Number(potRow.meta_trianual)
+      : suma3AniosPot;
+
+    const ejec2025 = Number(potRow.ejec_2025 || 0);
+    const ejec2026 = Number(potRow.ejec_2026 || 0);
+    const ejec2027 = Number(potRow.ejec_2027 || 0);
+
+    const potAnioActual = anioNum === 2025 ? potProg2025
+      : anioNum === 2026 ? potProg2026
+      : anioNum === 2027 ? potProg2027
+      : totalProgramado;
+
+    const potProgAcumulado = anioNum === 2025 ? potProg2025
+      : anioNum === 2026 ? (potProg2025 + potProg2026)
+      : anioNum === 2027 ? (potProg2025 + potProg2026 + potProg2027)
+      : 0;
+
+    const ejecAcumulado = anioNum === 2025 ? ejec2025
+      : anioNum === 2026 ? (ejec2025 + ejec2026)
+      : anioNum === 2027 ? (ejec2025 + ejec2026 + ejec2027)
+      : 0;
+
+    const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
+
+    const ejecPorAnio = {
+      2024: 0,
+      2025: ejec2025,
+      2026: ejec2026,
+      2027: ejec2027
+    };
+
+    const pctEjecPorAnio = {
+      2024: 0,
+      2025: potMetaTrianual > 0 ? round2((ejec2025 / potMetaTrianual) * 100) : 0,
+      2026: potMetaTrianual > 0 ? round2((ejec2026 / potMetaTrianual) * 100) : 0,
+      2027: potMetaTrianual > 0 ? round2((ejec2027 / potMetaTrianual) * 100) : 0
+    };
+
+    const pctMetaTrianual = potMetaTrianual > 0
+      ? round2((suma3AniosPot / potMetaTrianual) * 100)
+      : 100;
+    const pctMetaAnual = potMetaTrianual > 0
+      ? round2((potProgAcumulado / potMetaTrianual) * 100)
+      : 0;
+    const pctAvanceAnual = potMetaTrianual > 0
+      ? round2((ejecAcumulado / potMetaTrianual) * 100)
+      : 0;
+    const pctEjec2025 = pctEjecPorAnio[2025];
+    const pctValorInicial = pctEjec2025;
 
     const mesesPorTrimestre = {
       1: ["enero","febrero","marzo"],
@@ -403,7 +488,7 @@ exports.datosParaEstrategia = async (req, res) => {
       definicion:         est.strategy_nombre || est.lineas_accion || "",
       proposito:          est.pmd_objetivo  || "",
       formula:            est.unidad_medida ? `(Número de ${est.unidad_medida} realizadas / Número de ${est.unidad_medida} programadas) * 100` : "",
-      unidad_medida:      est.unidad_medida || "",
+      unidad_medida:      "Porcentaje",
       medios_verificacion: "Informe de actividades / Reportes de seguimiento",
 
       pmd_eje:              est.pmd_eje              || "",
@@ -421,12 +506,38 @@ exports.datosParaEstrategia = async (req, res) => {
 
       anio:                anioNum,
       periodicidad:        "Trimestral",
-      tipo_indicador:      "Gestión",
+      tipo_indicador:      "Estratégico",
       tipo_evaluacion:     "Porcentaje",
 
-      valor_inicial:       valorInicial,
-      meta_anual:          totalProgramado,
-      avance_anual:        totalEjecutado,
+      anio_base:           2025,
+      valor_anio_base:     pctEjec2025,
+      valor_minimo:        "",
+      valor_inicial:       pctValorInicial,
+      meta_anual:          pctMetaAnual,
+      avance_anual:        pctAvanceAnual,
+      meta_trianual:       pctMetaTrianual,
+      pot_calculado:       true,
+      pot_resumen: {
+        es_acumulado_v2: true,
+        pot_meta_trianual: potMetaTrianual,
+        pot_prog_2025: potProg2025,
+        pot_prog_2026: potProg2026,
+        pot_prog_2027: potProg2027,
+        pot_anio_actual: potAnioActual,
+        pot_prog_acumulado: potProgAcumulado,
+        ejecutado_2025: ejec2025,
+        ejecutado_2026: ejec2026,
+        ejecutado_2027: ejec2027,
+        ejecutado_anio: totalEjecutado,
+        ejecutado_acumulado: ejecAcumulado,
+        ejec_por_anio: ejecPorAnio,
+        pct_ejec_por_anio: pctEjecPorAnio,
+        pct_ejec_2025: pctEjec2025,
+        pct_avance_anual: pctAvanceAnual,
+        pct_meta_anual: pctMetaAnual,
+        pct_meta_trianual: pctMetaTrianual,
+        pct_valor_inicial: pctValorInicial
+      },
       calendarizacion,
 
       trimestres_raw: datosT,
@@ -855,9 +966,8 @@ exports.estrategiasPorDependencia = async (req, res) => {
 
 const getSemaforoFicha = (pct) => {
   const p = Number(pct)
-  if (p >= 90) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢" }
-  if (p >= 70) return { color:"#d97706", bg:"#fef3c7", label:"Bueno",   emoji:"🟡" }
-  if (p >= 50) return { color:"#f59e0b", bg:"#fffbeb", label:"Regular", emoji:"🟠" }
+  if (p >= 80) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢" }
+  if (p >= 60) return { color:"#d97706", bg:"#fef3c7", label:"Regular", emoji:"🟡" }
   return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",    emoji:"🔴" }
 }
 
