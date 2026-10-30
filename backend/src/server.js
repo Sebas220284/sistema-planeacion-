@@ -42,6 +42,7 @@ const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesR
 const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
+const soloLectura = require("./interfaces/http/middlewares/soloLecturaMiddleware")
 const { registrarSockets } = require("./sockets")
 
 
@@ -94,7 +95,6 @@ ioTransporte.on('connection', (socket) => {
     });
 });
 
-// Mitigación vulnerabilidad Brotli de Node (zlib, octubre 2026):
 app.use((req, res, next) => {
   const encodings = String(req.headers["content-encoding"] || "")
     .toLowerCase()
@@ -186,6 +186,7 @@ app.use("/api/poa-llenado", poaLlenadoRoutes)
 app.use("/api/estrategica", estrategicaRoutes)
 app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
 app.use("/api/indicadores", indicadoresRoutes)
+app.use("/api", soloLectura)
 
 app.use((req,res)=>{
 
