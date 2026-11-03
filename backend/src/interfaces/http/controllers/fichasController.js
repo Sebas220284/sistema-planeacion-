@@ -8,7 +8,10 @@ const CAMPOS = [
   "meta_anual","meta_trianual","producto","analisis_cualitativo","unidad_medida",
   "medios_verificacion","supuestos","responsable","correo_electronico","telefono",
   "criterio_claro","criterio_relevante","criterio_economico","criterio_monitoreable",
-  "criterio_adecuado","criterio_aportacion","calendarizacion","creado_por"
+  "criterio_adecuado","criterio_aportacion","calendarizacion",
+  "objetivos_narrativos","propuestos_preliminares",
+  "texto_claro","texto_relevante","texto_economico","texto_monitoreable","texto_adecuado","texto_aportacion",
+  "creado_por"
 ]
 
 const CAMPOS_HIST = [
@@ -19,7 +22,9 @@ const CAMPOS_HIST = [
   "meta_anual","meta_trianual","producto","analisis_cualitativo","unidad_medida",
   "medios_verificacion","supuestos","responsable","correo_electronico","telefono",
   "criterio_claro","criterio_relevante","criterio_economico","criterio_monitoreable",
-  "criterio_adecuado","criterio_aportacion","calendarizacion"
+  "criterio_adecuado","criterio_aportacion","calendarizacion",
+  "objetivos_narrativos","propuestos_preliminares",
+  "texto_claro","texto_relevante","texto_economico","texto_monitoreable","texto_adecuado","texto_aportacion"
 ]
 
 async function indicadorDeEstrategia(strategy_id) {
