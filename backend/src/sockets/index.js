@@ -2,7 +2,7 @@ const pool = require("../database/postgres")
 const {
   autenticarSocket, esRolPlaneacion, esInterno, puedeVerDependencia,
   permitir, modoEnforce, ROLES_CHAT
-} = require("./socketAuth")
+} = require("./socketsAuth")
 
 function registrarSockets(io) {
   io.use(autenticarSocket)
