@@ -43,6 +43,8 @@ const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
 const soloLectura = require("./interfaces/http/middlewares/soloLecturaMiddleware")
+const programasPresupuestariosRoutes = require("./interfaces/http/routes/programasPresupuestariosRoutes")
+
 const { registrarSockets } = require("./sockets")
 
 
@@ -187,6 +189,7 @@ app.use("/api/estrategica", estrategicaRoutes)
 app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
 app.use("/api/indicadores", indicadoresRoutes)
 app.use("/api", soloLectura)
+app.use("/api/programas-presupuestarios", programasPresupuestariosRoutes)
 
 app.use((req,res)=>{
 
