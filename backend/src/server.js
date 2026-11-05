@@ -44,7 +44,7 @@ const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
 const soloLectura = require("./interfaces/http/middlewares/lecturaMiddleware")
 const programasPresupuestariosRoutes = require("./interfaces/http/routes/programasPresupuestariosRoutes")
-
+const { ocultarErroresInternos, rutaNoEncontrada, manejadorErrores } = require("./interfaces/http/middlewares/erroresMiddleware")
 const { registrarSockets } = require("./sockets")
 
 
@@ -56,20 +56,19 @@ app.set('trust proxy', 1)
 
 const server = http.createServer(app)
 
-const io = new Server(server,{
-  cors:{
-    origin:"*",
-    methods:["GET","POST","PUT","DELETE"]
-  }
-})
-
-
 const allowedOrigins=[
 "https://planeacion.tuxtla.gob.mx",
 "http://localhost:5173",
 "http://localhost:5174"
 
 ]
+
+const io = new Server(server,{
+  cors:{
+    origin: allowedOrigins,
+    methods:["GET","POST","PUT","DELETE"]
+  }
+})
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -91,7 +90,7 @@ registrarSockets(io)
 const ioTransporte = io.of('/transporte');
 ioTransporte.on('connection', (socket) => {
     console.log('Conectado a Transporte');
-    
+
     socket.on('actualizar_ubicacion', (coords) => {
         ioTransporte.emit('bus_moviéndose', coords);
     });
@@ -109,6 +108,7 @@ app.use((req, res, next) => {
 })
 
 app.use(express.json({ limit: '10mb' }))
+app.use(ocultarErroresInternos)
 async function checkDatabase(){
 
   try{
@@ -153,6 +153,7 @@ const authMiddleware = require("./interfaces/http/middlewares/authMiddleware")
 app.use("/api/auth",authRoutes)
 
 app.use("/api", authMiddleware)
+app.use("/api", soloLectura)
 
 app.use("/api/trimestres",trimestresRoutes)
 app.use("/api/planeacion",planeacionRoutes)
@@ -188,25 +189,10 @@ app.use("/api/poa-llenado", poaLlenadoRoutes)
 app.use("/api/estrategica", estrategicaRoutes)
 app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
 app.use("/api/indicadores", indicadoresRoutes)
-app.use("/api", soloLectura)
 app.use("/api/programas-presupuestarios", programasPresupuestariosRoutes)
 
-app.use((req,res)=>{
-
-  res.status(404).json({
-    error:"Ruta no encontrada"
-  })
-
-})
-app.use((err,req,res,next)=>{
-
-  console.error("Error:",err)
-
-  res.status(500).json({
-    error:"Error interno del servidor"
-  })
-
-})
+app.use(rutaNoEncontrada)
+app.use(manejadorErrores)
 
 const PORT = process.env.PORT || 3100
 
