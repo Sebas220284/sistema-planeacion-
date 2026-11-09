@@ -1,6 +1,6 @@
 const express = require("express")
 const router = express.Router()
-const controller = require("../controllers/programasPresupuestariosController")
+const controller = require("../controllers/programapresupuestariosController")
 
 router.get("/prefill", controller.prefill)
 router.get("/", controller.listar)
