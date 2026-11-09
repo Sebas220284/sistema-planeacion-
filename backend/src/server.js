@@ -42,7 +42,7 @@ const segReportesRoutes = require("./interfaces/http/routes/seguimientoReportesR
 const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
-const soloLectura = require("./interfaces/http/middlewares/lecturaMiddleware")
+const soloLectura = require("./interfaces/http/middlewares/soloMiddleware")
 const programasPresupuestariosRoutes = require("./interfaces/http/routes/programasPresupuestariosRoutes")
 
 const { registrarSockets } = require("./sockets")
