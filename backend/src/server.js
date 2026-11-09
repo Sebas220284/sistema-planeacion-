@@ -43,7 +43,7 @@ const poaLlenadoRoutes = require("./interfaces/http/routes/poaLlenadoRoutes")
 const estrategicaRoutes = require("./interfaces/http/routes/estrategicaRoutes")
 const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
 const soloLectura = require("./interfaces/http/middlewares/lecturaMiddleware")
-const programasPresupuestariosRoutes = require("./interfaces/http/routes/programasPresupuestariosRoutes")
+const programasPresupuestariosRoutes = require("./interfaces/http/routes/programaPresupuestariosRoutes")
 const { ocultarErroresInternos, rutaNoEncontrada, manejadorErrores } = require("./interfaces/http/middlewares/erroresMiddleware")
 const { registrarSockets } = require("./sockets")
 
