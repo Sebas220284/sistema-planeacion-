@@ -28,7 +28,7 @@ class LoginUser {
         email: user.email,
         rol: user.role
       },
-      process.env.JWT_SECRET || "secret",
+      process.env.JWT_SECRET,
       {
         expiresIn:"8h"
       }
