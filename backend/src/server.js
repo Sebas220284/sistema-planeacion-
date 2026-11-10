@@ -45,6 +45,7 @@ const indicadoresRoutes = require("./interfaces/http/routes/indicadoresRoutes")
 const soloLectura = require("./interfaces/http/middlewares/lecturaMiddleware")
 const programasPresupuestariosRoutes = require("./interfaces/http/routes/programaPresupuestariosRoutes")
 const { ocultarErroresInternos, rutaNoEncontrada, manejadorErrores } = require("./interfaces/http/middlewares/erroresMiddleware")
+const supuestosRoutes = require("./interfaces/http/routes/supuestoRoutes")
 const { registrarSockets } = require("./sockets")
 
 
@@ -190,6 +191,7 @@ app.use("/api/estrategica", estrategicaRoutes)
 app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAlineacionRoutes"))
 app.use("/api/indicadores", indicadoresRoutes)
 app.use("/api/programas-presupuestarios", programasPresupuestariosRoutes)
+app.use("/api/supuestos", supuestosRoutes)
 
 app.use(rutaNoEncontrada)
 app.use(manejadorErrores)
