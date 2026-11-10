@@ -1,6 +1,6 @@
 const express = require("express")
 const router = express.Router()
-const controller = require("../controllers/supuestosController")
+const controller = require("../controllers/supuestoController")
 
 router.get("/", controller.listar)
 router.get("/por-estrategia/:strategy_id", controller.porEstrategia)
