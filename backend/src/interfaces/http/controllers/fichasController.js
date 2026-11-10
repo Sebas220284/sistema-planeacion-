@@ -8,10 +8,7 @@ const CAMPOS = [
   "meta_anual","meta_trianual","producto","analisis_cualitativo","unidad_medida",
   "medios_verificacion","supuestos","responsable","correo_electronico","telefono",
   "criterio_claro","criterio_relevante","criterio_economico","criterio_monitoreable",
-  "criterio_adecuado","criterio_aportacion","calendarizacion",
-  "objetivos_narrativos","propuestos_preliminares",
-  "texto_claro","texto_relevante","texto_economico","texto_monitoreable","texto_adecuado","texto_aportacion",
-  "creado_por"
+  "criterio_adecuado","criterio_aportacion","calendarizacion","creado_por"
 ]
 
 const CAMPOS_HIST = [
@@ -22,9 +19,7 @@ const CAMPOS_HIST = [
   "meta_anual","meta_trianual","producto","analisis_cualitativo","unidad_medida",
   "medios_verificacion","supuestos","responsable","correo_electronico","telefono",
   "criterio_claro","criterio_relevante","criterio_economico","criterio_monitoreable",
-  "criterio_adecuado","criterio_aportacion","calendarizacion",
-  "objetivos_narrativos","propuestos_preliminares",
-  "texto_claro","texto_relevante","texto_economico","texto_monitoreable","texto_adecuado","texto_aportacion"
+  "criterio_adecuado","criterio_aportacion","calendarizacion"
 ]
 
 async function indicadorDeEstrategia(strategy_id) {
@@ -35,6 +30,30 @@ async function indicadorDeEstrategia(strategy_id) {
     [strategy_id]
   )
   return r.rows[0]?.indicador || null
+}
+
+
+
+async function lineaBaseDeEstrategia(strategy_id, { avance = 0, metaAcum = 0, metaTrianual = 0 } = {}) {
+  if (!strategy_id) return null
+  const r = await pool.query(
+    `SELECT clave, base_valor, base_porcentaje FROM v_estrategia_indicador
+      WHERE strategy_id = $1 AND base_valor IS NOT NULL LIMIT 1`, [strategy_id])
+  const b = r.rows[0]
+  if (!b) return null
+  const base = Number(b.base_valor), basePct = Number(b.base_porcentaje)
+  const universo = base / (basePct / 100)
+  const pct = (x) => Math.round((base + Number(x || 0)) / universo * 10000) / 100
+  return {
+    clave: b.clave,
+    base_valor: base,
+    base_porcentaje: basePct,
+    universo: Math.round(universo),
+    valor_inicial_pct: basePct,
+    avance_pct: pct(avance),
+    meta_anual_pct: pct(metaAcum),
+    meta_trianual_pct: pct(metaTrianual),
+  }
 }
 
 async function completarIndicador(body) {
@@ -343,7 +362,6 @@ exports.datosParaEstrategia = async (req, res) => {
         d.name as dependencia_nombre,
         d.titular as dependencia_titular,
         d.enlace as dependencia_enlace,
-        COUNT(pt.id)::int as total_lineas,
         MAX(pt.pmd_eje) as pmd_eje,
         MAX(pt.pmd_tema) as pmd_tema,
         MAX(pt.pmd_politica_publica) as pmd_politica_publica,
@@ -356,8 +374,6 @@ exports.datosParaEstrategia = async (req, res) => {
       JOIN dependencies d ON d.id = pt.dependency_id
       WHERE s.id = $1
       GROUP BY s.id, d.id
-      ORDER BY COUNT(pt.id) DESC
-      LIMIT 1
     `, [strategy_id]);
 
     if (!estrategiaQuery.rows[0]) {
@@ -375,33 +391,6 @@ exports.datosParaEstrategia = async (req, res) => {
       ORDER BY trimestre, tipo
     `, [strategy_id, anioNum]);
 
-    const potQuery = await pool.query(`
-      WITH pot_est AS (
-        SELECT
-          COALESCE(SUM(pr.meta_programada), 0)::numeric AS meta_trianual,
-          COALESCE(SUM(pr.ejercicio_2025), 0)::numeric AS prog_2025,
-          COALESCE(SUM(pr.ejercicio_2026), 0)::numeric AS prog_2026,
-          COALESCE(SUM(pr.ejercicio_2027), 0)::numeric AS prog_2027
-        FROM planning_templates pt
-        JOIN pot_registros pr ON pr.planning_template_id = pt.id
-        WHERE pt.strategy_id = $1
-      ),
-      tr_est AS (
-        SELECT
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2025), 0)::numeric AS ejec_2025,
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2026), 0)::numeric AS ejec_2026,
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'ejecutado' AND tr.anio = 2027), 0)::numeric AS ejec_2027,
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2025), 0)::numeric AS tr_prog_2025,
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2026), 0)::numeric AS tr_prog_2026,
-          COALESCE(SUM(tr.valor) FILTER (WHERE tr.tipo = 'programado' AND tr.anio = 2027), 0)::numeric AS tr_prog_2027
-        FROM planning_templates pt
-        LEFT JOIN planning_trimestres tr ON tr.planning_id = pt.id
-        WHERE pt.strategy_id = $1
-      )
-      SELECT * FROM pot_est CROSS JOIN tr_est
-    `, [strategy_id]);
-
-    const potRow = potQuery.rows[0] || {};
     const datosT = { programado:{1:0,2:0,3:0,4:0}, ejecutado:{1:0,2:0,3:0,4:0} };
     trimestres.rows.forEach(t => {
       if (datosT[t.tipo] && t.trimestre >= 1 && t.trimestre <= 4) {
@@ -411,62 +400,7 @@ exports.datosParaEstrategia = async (req, res) => {
 
     const totalProgramado = Object.values(datosT.programado).reduce((s,v)=>s+v, 0);
     const totalEjecutado  = Object.values(datosT.ejecutado ).reduce((s,v)=>s+v, 0);
-    const valorInicialRaw = datosT.programado[1] || 0;
-
-    const potProg2025 = Number(potRow.prog_2025 || 0) || Number(potRow.tr_prog_2025 || 0);
-    const potProg2026 = Number(potRow.prog_2026 || 0) || Number(potRow.tr_prog_2026 || 0);
-    const potProg2027 = Number(potRow.prog_2027 || 0) || Number(potRow.tr_prog_2027 || 0);
-    const suma3AniosPot = potProg2025 + potProg2026 + potProg2027;
-    const potMetaTrianual = Number(potRow.meta_trianual || 0) > 0
-      ? Number(potRow.meta_trianual)
-      : suma3AniosPot;
-
-    const ejec2025 = Number(potRow.ejec_2025 || 0);
-    const ejec2026 = Number(potRow.ejec_2026 || 0);
-    const ejec2027 = Number(potRow.ejec_2027 || 0);
-
-    const potAnioActual = anioNum === 2025 ? potProg2025
-      : anioNum === 2026 ? potProg2026
-      : anioNum === 2027 ? potProg2027
-      : totalProgramado;
-
-    const potProgAcumulado = anioNum === 2025 ? potProg2025
-      : anioNum === 2026 ? (potProg2025 + potProg2026)
-      : anioNum === 2027 ? (potProg2025 + potProg2026 + potProg2027)
-      : 0;
-
-    const ejecAcumulado = anioNum === 2025 ? ejec2025
-      : anioNum === 2026 ? (ejec2025 + ejec2026)
-      : anioNum === 2027 ? (ejec2025 + ejec2026 + ejec2027)
-      : 0;
-
-    const round2 = (n) => Math.round(Number(n || 0) * 100) / 100;
-
-    const ejecPorAnio = {
-      2024: 0,
-      2025: ejec2025,
-      2026: ejec2026,
-      2027: ejec2027
-    };
-
-    const pctEjecPorAnio = {
-      2024: 0,
-      2025: potMetaTrianual > 0 ? round2((ejec2025 / potMetaTrianual) * 100) : 0,
-      2026: potMetaTrianual > 0 ? round2((ejec2026 / potMetaTrianual) * 100) : 0,
-      2027: potMetaTrianual > 0 ? round2((ejec2027 / potMetaTrianual) * 100) : 0
-    };
-
-    const pctMetaTrianual = potMetaTrianual > 0
-      ? round2((suma3AniosPot / potMetaTrianual) * 100)
-      : 100;
-    const pctMetaAnual = potMetaTrianual > 0
-      ? round2((potProgAcumulado / potMetaTrianual) * 100)
-      : 0;
-    const pctAvanceAnual = potMetaTrianual > 0
-      ? round2((ejecAcumulado / potMetaTrianual) * 100)
-      : 0;
-    const pctEjec2025 = pctEjecPorAnio[2025];
-    const pctValorInicial = pctEjec2025;
+    const valorInicial    = datosT.programado[1] || 0;
 
     const mesesPorTrimestre = {
       1: ["enero","febrero","marzo"],
@@ -493,7 +427,7 @@ exports.datosParaEstrategia = async (req, res) => {
       definicion:         est.strategy_nombre || est.lineas_accion || "",
       proposito:          est.pmd_objetivo  || "",
       formula:            est.unidad_medida ? `(Número de ${est.unidad_medida} realizadas / Número de ${est.unidad_medida} programadas) * 100` : "",
-      unidad_medida:      "Porcentaje",
+      unidad_medida:      est.unidad_medida || "",
       medios_verificacion: "Informe de actividades / Reportes de seguimiento",
 
       pmd_eje:              est.pmd_eje              || "",
@@ -511,38 +445,12 @@ exports.datosParaEstrategia = async (req, res) => {
 
       anio:                anioNum,
       periodicidad:        "Trimestral",
-      tipo_indicador:      "Estratégico",
+      tipo_indicador:      "Gestión",
       tipo_evaluacion:     "Porcentaje",
 
-      anio_base:           2025,
-      valor_anio_base:     pctEjec2025,
-      valor_minimo:        "",
-      valor_inicial:       pctValorInicial,
-      meta_anual:          pctMetaAnual,
-      avance_anual:        pctAvanceAnual,
-      meta_trianual:       pctMetaTrianual,
-      pot_calculado:       true,
-      pot_resumen: {
-        es_acumulado_v2: true,
-        pot_meta_trianual: potMetaTrianual,
-        pot_prog_2025: potProg2025,
-        pot_prog_2026: potProg2026,
-        pot_prog_2027: potProg2027,
-        pot_anio_actual: potAnioActual,
-        pot_prog_acumulado: potProgAcumulado,
-        ejecutado_2025: ejec2025,
-        ejecutado_2026: ejec2026,
-        ejecutado_2027: ejec2027,
-        ejecutado_anio: totalEjecutado,
-        ejecutado_acumulado: ejecAcumulado,
-        ejec_por_anio: ejecPorAnio,
-        pct_ejec_por_anio: pctEjecPorAnio,
-        pct_ejec_2025: pctEjec2025,
-        pct_avance_anual: pctAvanceAnual,
-        pct_meta_anual: pctMetaAnual,
-        pct_meta_trianual: pctMetaTrianual,
-        pct_valor_inicial: pctValorInicial
-      },
+      valor_inicial:       valorInicial,
+      meta_anual:          totalProgramado,
+      avance_anual:        totalEjecutado,
       calendarizacion,
 
       trimestres_raw: datosT,
@@ -918,6 +826,11 @@ exports.datosEstrategiaParaFicha = async (req, res) => {
         Object.values(resumen[anioActual]?.ejecutado||{}).reduce((s,v)=>s+v,0) * 100
       ) / 100,
       meta_trianual:        Math.round(programado_trianual * 100) / 100,
+      linea_base: await lineaBaseDeEstrategia(strategy_id, {
+        avance: ejecutado_trianual,
+        metaAcum: Object.values(resumen[anioActual]?.programado||{}).reduce((s,v)=>s+v,0),
+        metaTrianual: programado_trianual
+      }),
 
       programado_trianual:  Math.round(programado_trianual * 100) / 100,
       ejecutado_trianual:   Math.round(ejecutado_trianual  * 100) / 100,
@@ -971,8 +884,9 @@ exports.estrategiasPorDependencia = async (req, res) => {
 
 const getSemaforoFicha = (pct) => {
   const p = Number(pct)
-  if (p >= 80) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢" }
-  if (p >= 60) return { color:"#d97706", bg:"#fef3c7", label:"Regular", emoji:"🟡" }
+  if (p >= 90) return { color:"#16a34a", bg:"#d1fae5", label:"Óptimo",  emoji:"🟢" }
+  if (p >= 70) return { color:"#d97706", bg:"#fef3c7", label:"Bueno",   emoji:"🟡" }
+  if (p >= 50) return { color:"#f59e0b", bg:"#fffbeb", label:"Regular", emoji:"🟠" }
   return        { color:"#dc2626", bg:"#fee2e2", label:"Bajo",    emoji:"🔴" }
 }
 
@@ -1041,6 +955,7 @@ exports.indicadorConPOT = async (req, res) => {
       suma_ejecutado: sumaEjec,
       suma_meta_pot: sumaMeta,
       pct_indicador: pct,
+      linea_base: await lineaBaseDeEstrategia(strategy_id, { avance: sumaEjec, metaAcum: sumaMeta, metaTrianual: sumaMeta }),
       semaforo: pct === null ? null : getSemaforoFicha(pct),
       lineas_sin_meta_pot: detalle.filter(x => x.meta_pot === 0).length,
       detalle
