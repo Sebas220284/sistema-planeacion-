@@ -50,7 +50,8 @@ async function completarIndicador(body) {
   if (r.rows[0]?.indicador) body.nombre_indicador = r.rows[0].indicador
 }
 
-
+// Indicador con línea base (hoy solo 1.1.1.1): % = (base + avance) / (base / base_%) * 100
+// Devuelve null si la estrategia no tiene línea base -> el cálculo normal no cambia.
 async function lineaBaseDeEstrategia(strategy_id, { avance = 0, metaAcum = 0, metaTrianual = 0 } = {}) {
   if (!strategy_id) return null
   const r = await pool.query(
@@ -325,7 +326,7 @@ exports.datosParaFicha = async (req, res) => {
       tipo_indicador:      "Gestión",
       tipo_evaluacion:     "Porcentaje",
 
-      valor_inicial:   valorInicial,
+      valor_inicial:   (await lineaBaseDeEstrategia(l.strategy_id))?.valor_inicial_pct ?? "",   // solo 1.1.1.1
       avance_anual:    totalEjecutado,
       meta_anual:      totalProgramado,
       meta_trianual:   totalProgramado * 3,
@@ -512,10 +513,12 @@ exports.datosParaEstrategia = async (req, res) => {
       });
     });
 
+    // Línea base (solo 1.1.1.1): reemplaza los % calculados contra el total del POT
     const lb = await lineaBaseDeEstrategia(est.strategy_id, {
       avance: ejecAcumulado, metaAcum: potProgAcumulado, metaTrianual: potMetaTrianual
     });
 
+    // Histórico acumulado por año (tabla de la pág. 2 de la ficha) con línea base
     let historico_acumulado = null;
     if (lb) {
       const progPorAnio = { 2025: potProg2025, 2026: potProg2025 + potProg2026, 2027: potProg2025 + potProg2026 + potProg2027 };
@@ -558,7 +561,7 @@ exports.datosParaEstrategia = async (req, res) => {
       anio_base:           2025,
       valor_anio_base:     lb ? lb.valor_inicial_pct : pctEjec2025,
       valor_minimo:        "",
-      valor_inicial:       lb ? lb.valor_inicial_pct : pctValorInicial,
+      valor_inicial:       lb ? lb.valor_inicial_pct : "",   // solo 1.1.1.1 tiene valor inicial
       meta_anual:          lb ? lb.meta_anual_pct : pctMetaAnual,
       avance_anual:        lb ? lb.avance_pct : pctAvanceAnual,
       meta_trianual:       lb ? lb.meta_trianual_pct : pctMetaTrianual,
@@ -951,9 +954,7 @@ exports.datosEstrategiaParaFicha = async (req, res) => {
       anio_base:            anio_inicio - 1,
       valor_anio_base:      0,
       valor_minimo:         0,
-      valor_inicial:        Math.round(
-        (Object.values(resumen[anio_inicio]?.programado||{}).reduce((s,v)=>s+v,0)) * 100
-      ) / 100,
+      valor_inicial:        (await lineaBaseDeEstrategia(strategy_id))?.valor_inicial_pct ?? "",   // solo 1.1.1.1
       meta_anual:           Math.round(
         Object.values(resumen[anioActual]?.programado||{}).reduce((s,v)=>s+v,0) * 100
       ) / 100,
