@@ -70,6 +70,7 @@ async function lineaBaseDeEstrategia(strategy_id, { avance = 0, metaAcum = 0, me
     avance_pct: pct(avance),
     meta_anual_pct: pct(metaAcum),
     meta_trianual_pct: pct(metaTrianual),
+    pct,
   }
 }
 
@@ -515,6 +516,19 @@ exports.datosParaEstrategia = async (req, res) => {
       avance: ejecAcumulado, metaAcum: potProgAcumulado, metaTrianual: potMetaTrianual
     });
 
+    let historico_acumulado = null;
+    if (lb) {
+      const progPorAnio = { 2025: potProg2025, 2026: potProg2025 + potProg2026, 2027: potProg2025 + potProg2026 + potProg2027 };
+      const ejecPorAnioAcum = { 2025: ejec2025, 2026: ejec2025 + ejec2026, 2027: ejec2025 + ejec2026 + ejec2027 };
+      historico_acumulado = [2025, 2026, 2027].filter(a => a <= anioNum).map(a => ({
+        anio: a,
+        valor_inicial: a === 2025 ? lb.valor_inicial_pct : lb.pct(ejecPorAnioAcum[a - 1]),
+        avance_anual:  lb.pct(ejecPorAnioAcum[a]),
+        meta_anual:    lb.pct(progPorAnio[a]),
+        meta_trianual: lb.meta_trianual_pct
+      }));
+    }
+
     res.json({
       nombre_indicador:   (await indicadorDeEstrategia(est.strategy_id)) || est.strategy_nombre || est.lineas_accion || "",
       definicion:         est.strategy_nombre || est.lineas_accion || "",
@@ -548,7 +562,8 @@ exports.datosParaEstrategia = async (req, res) => {
       meta_anual:          lb ? lb.meta_anual_pct : pctMetaAnual,
       avance_anual:        lb ? lb.avance_pct : pctAvanceAnual,
       meta_trianual:       lb ? lb.meta_trianual_pct : pctMetaTrianual,
-      linea_base:          lb,
+      linea_base:          lb ? { ...lb, pct: undefined } : null,
+      historico_acumulado,
       pot_calculado:       true,
       pot_resumen: {
         es_acumulado_v2: true,
