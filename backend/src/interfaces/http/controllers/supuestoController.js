@@ -62,16 +62,15 @@ exports.listar = async (req, res) => {
     const where = []
     if (req.query.q) {
       params.push(`%${String(req.query.q).trim()}%`)
-      where.push(`(i.clave ILIKE $1 OR i.indicador ILIKE $1 OR p.supuesto ILIKE $1)`)
+      where.push(`(v.clave ILIKE $1 OR v.indicador ILIKE $1 OR v.supuesto ILIKE $1 OR v.estrategia ILIKE $1)`)
     }
-    if (req.query.pendientes === "1") where.push("p.id IS NULL")
+    if (req.query.pendientes === "1") where.push("v.supuesto_id IS NULL")
 
     const { rows } = await pool.query(
-      `SELECT i.clave, i.indicador, p.id AS supuesto_id, p.orden, p.supuesto
-         FROM estrategia_indicadores i
-         LEFT JOIN estrategia_supuestos p ON p.clave = i.clave
+      `SELECT v.strategy_id, v.estrategia, v.clave, v.indicador, v.supuesto_id, v.orden, v.supuesto
+         FROM v_estrategia_supuesto v
          ${where.length ? "WHERE " + where.join(" AND ") : ""}
-        ORDER BY string_to_array(i.clave, '.')::int[], p.orden`,
+        ORDER BY string_to_array(v.clave, '.')::int[], v.orden`,
       params
     )
     res.json(agrupar(rows))
@@ -105,11 +104,10 @@ exports.porClave = async (req, res) => {
     if (!RE_CLAVE.test(clave)) return res.status(400).json({ error: "Clave inválida. Ejemplo: 6.2.1.4" })
 
     const { rows } = await pool.query(
-      `SELECT i.clave, i.indicador, p.id AS supuesto_id, p.orden, p.supuesto
-         FROM estrategia_indicadores i
-         LEFT JOIN estrategia_supuestos p ON p.clave = i.clave
-        WHERE i.clave = $1
-        ORDER BY p.orden`,
+      `SELECT v.strategy_id, v.estrategia, v.clave, v.indicador, v.supuesto_id, v.orden, v.supuesto
+         FROM v_estrategia_supuesto v
+        WHERE v.clave = $1
+        ORDER BY v.orden`,
       [clave]
     )
     if (!rows.length) return res.status(404).json({ error: "Clave no encontrada en el catálogo." })

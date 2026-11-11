@@ -192,6 +192,7 @@ app.use("/api/lineas-accion", require("./interfaces/http/routes/lineasNuevaAline
 app.use("/api/indicadores", indicadoresRoutes)
 app.use("/api/programas-presupuestarios", programasPresupuestariosRoutes)
 app.use("/api/supuestos", supuestosRoutes)
+app.use("/api/supuesto", supuestosRoutes)
 
 app.use(rutaNoEncontrada)
 app.use(manejadorErrores)

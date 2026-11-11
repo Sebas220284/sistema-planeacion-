@@ -50,6 +50,30 @@ async function completarIndicador(body) {
   if (r.rows[0]?.indicador) body.nombre_indicador = r.rows[0].indicador
 }
 
+async function supuestoDeEstrategia(strategy_id) {
+  if (!strategy_id) return null
+  const r = await pool.query(
+    `SELECT supuesto FROM v_estrategia_supuesto
+     WHERE strategy_id = $1 AND supuesto IS NOT NULL
+     ORDER BY orden ASC LIMIT 1`,
+    [strategy_id]
+  )
+  return r.rows[0]?.supuesto || null
+}
+
+async function completarSupuesto(body) {
+  if (body.supuestos && String(body.supuestos).trim()) return
+  const r = await pool.query(`
+    SELECT supuesto FROM v_estrategia_supuesto
+    WHERE supuesto IS NOT NULL
+      AND ( strategy_id = $1::uuid
+         OR clave = substring($2::text FROM '^Estrategia\\s+(\\d+(?:\\.\\d+)+)') )
+    ORDER BY (strategy_id = $1::uuid) DESC NULLS LAST, orden ASC
+    LIMIT 1
+  `, [body.strategy_id || null, body.estrategia || ""])
+  if (r.rows[0]?.supuesto) body.supuestos = r.rows[0].supuesto
+}
+
 // Indicador con línea base (hoy solo 1.1.1.1): % = (base + avance) / (base / base_%) * 100
 // Devuelve null si la estrategia no tiene línea base -> el cálculo normal no cambia.
 async function lineaBaseDeEstrategia(strategy_id, { avance = 0, metaAcum = 0, metaTrianual = 0 } = {}) {
@@ -78,6 +102,7 @@ async function lineaBaseDeEstrategia(strategy_id, { avance = 0, metaAcum = 0, me
 exports.crear = async (req, res) => {
   try {
     await completarIndicador(req.body)
+    await completarSupuesto(req.body)
     const vals = CAMPOS.map(c => (req.body[c] === "" ? null : (req.body[c] ?? null)))
     const cols = CAMPOS.join(",")
     const params = CAMPOS.map((_,i) => `$${i+1}`).join(",")
@@ -133,6 +158,7 @@ exports.porDependencia = async (req, res) => {
 exports.actualizar = async (req, res) => {
   try {
     await completarIndicador(req.body)
+    await completarSupuesto(req.body)
     const { id } = req.params
     const { comentario_cambio, modificado_por } = req.body
 
@@ -307,6 +333,7 @@ exports.datosParaFicha = async (req, res) => {
       formula:            `(Número de ${l.unidad_medida || "acciones"} realizadas / Número de ${l.unidad_medida || "acciones"} programadas) * 100`,
       unidad_medida:      l.unidad_medida || "",
       medios_verificacion: "Informe de actividades / Reportes de seguimiento",
+      supuestos:          (await supuestoDeEstrategia(l.strategy_id)) || "",
 
       pmd_eje:              l.pmd_eje              || "",
       pmd_tema:             l.pmd_tema             || "",
@@ -539,6 +566,7 @@ exports.datosParaEstrategia = async (req, res) => {
       formula:            est.unidad_medida ? `(Número de ${est.unidad_medida} realizadas / Número de ${est.unidad_medida} programadas) * 100` : "",
       unidad_medida:      "Porcentaje",
       medios_verificacion: "Informe de actividades / Reportes de seguimiento",
+      supuestos:          (await supuestoDeEstrategia(est.strategy_id)) || "",
 
       pmd_eje:              est.pmd_eje              || "",
       pmd_tema:             est.pmd_tema             || "",
