@@ -1,7 +1,7 @@
 
 const express = require("express")
 const router = express.Router()
-const c = require("../controllers/programasPresupuestariosFichaController")
+const c = require("../controllers/programapresupuestariosController")
 
 router.get("/vinculacion/lineas", c.lineasDisponibles)
 router.get("/vinculacion", c.vinculacion)
