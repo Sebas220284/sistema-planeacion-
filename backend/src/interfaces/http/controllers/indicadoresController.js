@@ -19,19 +19,25 @@ exports.listar = async (req, res) => {
 
     const r = await pool.query(`
       SELECT
-        strategy_id,
-        estrategia,
-        clave,
-        split_part(clave, '.', 1) AS eje_num,
-        indicador,
-        requiere_revision,
-        nota,
-        (SELECT COUNT(*)::int FROM planning_templates pt WHERE pt.strategy_id = v_estrategia_indicador.strategy_id) AS num_lineas
-      FROM v_estrategia_indicador
-      ${whereClause}
+        v.strategy_id,
+        v.estrategia,
+        v.clave,
+        split_part(v.clave, '.', 1) AS eje_num,
+        v.indicador,
+        v.requiere_revision,
+        v.nota,
+        p.supuesto,
+        (SELECT COUNT(*)::int FROM planning_templates pt WHERE pt.strategy_id = v.strategy_id) AS num_lineas
+      FROM v_estrategia_indicador v
+      LEFT JOIN (
+        SELECT DISTINCT ON (clave) clave, supuesto
+        FROM estrategia_supuestos
+        ORDER BY clave, orden ASC
+      ) p ON p.clave = v.clave
+      ${whereClause ? whereClause.replace(/\bclave\b/g, 'v.clave').replace(/\bindicador\b/g, 'v.indicador').replace(/\brequiere_revision\b/g, 'v.requiere_revision') : ""}
       ORDER BY
-        string_to_array(clave, '.')::int[],
-        (SELECT COUNT(*) FROM planning_templates pt WHERE pt.strategy_id = v_estrategia_indicador.strategy_id) DESC
+        string_to_array(v.clave, '.')::int[],
+        (SELECT COUNT(*) FROM planning_templates pt WHERE pt.strategy_id = v.strategy_id) DESC
     `, params)
     res.json(r.rows)
   } catch (e) {
@@ -80,9 +86,14 @@ exports.porEje = async (req, res) => {
 exports.porEstrategia = async (req, res) => {
   try {
     const r = await pool.query(`
-      SELECT strategy_id, estrategia, clave, indicador, requiere_revision
-      FROM v_estrategia_indicador
-      WHERE strategy_id = $1
+      SELECT v.strategy_id, v.estrategia, v.clave, v.indicador, v.requiere_revision, p.supuesto
+      FROM v_estrategia_indicador v
+      LEFT JOIN (
+        SELECT DISTINCT ON (clave) clave, supuesto
+        FROM estrategia_supuestos
+        ORDER BY clave, orden ASC
+      ) p ON p.clave = v.clave
+      WHERE v.strategy_id = $1
     `, [req.params.strategy_id])
     if (!r.rows[0]) return res.status(404).json({ error: "Estrategia no encontrada" })
     res.json(r.rows[0])
