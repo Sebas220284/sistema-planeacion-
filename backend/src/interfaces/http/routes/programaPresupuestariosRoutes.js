@@ -1,13 +1,13 @@
+
 const express = require("express")
 const router = express.Router()
-const controller = require("../controllers/programapresupuestariosController")
+const c = require("../controllers/programasPresupuestariosFichaController")
 
-router.get("/prefill", controller.prefill)
-router.get("/", controller.listar)
-router.get("/:id", controller.obtener)
-router.post("/", controller.crear)
-router.put("/:id", controller.actualizar)
-router.patch("/:id/estatus", controller.cambiarEstatus)
-router.delete("/:id", controller.eliminar)
+router.get("/vinculacion/lineas", c.lineasDisponibles)
+router.get("/vinculacion", c.vinculacion)
+router.get("/:id/ficha", c.obtenerFicha)
+router.put("/:id/ficha", c.guardarFicha)
+router.get("/:id/validacion", c.obtenerValidacion)
+router.put("/:id/validacion", c.guardarValidacion)
 
 module.exports = router
