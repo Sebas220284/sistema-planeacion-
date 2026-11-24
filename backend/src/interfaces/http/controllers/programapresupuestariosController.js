@@ -1,6 +1,24 @@
 
 const pool = require("../../../database/postgres")
 
+let _columnasAseguradas = null
+function asegurarColumnas() {
+  if (!_columnasAseguradas) {
+    _columnasAseguradas = pool
+      .query(
+        `ALTER TABLE programas_presupuestarios
+           ADD COLUMN IF NOT EXISTS instrumento_diseño TEXT,
+           ADD COLUMN IF NOT EXISTS isd TEXT;`
+      )
+      .catch((err) => {
+        _columnasAseguradas = null
+        console.error("[PP] Error asegurando columnas instrumento_diseño/isd:", err)
+      })
+  }
+  return _columnasAseguradas
+}
+asegurarColumnas()
+
 const ROLES_TODAS_DEPENDENCIAS = ["admin", "planeacion", "planeacion_estrategica"] // editan cualquier programa
 const ROLES_DEPENDENCIA = ["dependencias"] 
 
@@ -23,7 +41,7 @@ const esMisma = (u, depId) => !!u.dependency_id && u.dependency_id === depId
 
 
 const CAMPOS_TEXTO = [
-  "nombre", "clave_programatica", "modalidad_programatica", "unidad_responsable", "area_ejecutora",
+  "nombre", "clave_programatica", "modalidad_programatica", "instrumento_diseño", "isd", "unidad_responsable", "area_ejecutora",
   "responsable_integracion", "cargo", "correo_institucional", "telefono_institucional",
   "problematica_publica", "diagnostico_general", "justificacion_intervencion",
   "eje_rector", "eje_transversal", "politica_publica", "objetivo_estrategico", "estrategia", "linea_accion", "ods",
@@ -52,6 +70,12 @@ const vacioANull = (v) => {
 function extraerCampos(body) {
   const out = {}
   for (const c of CAMPOS_TEXTO) if (c in body) out[c] = vacioANull(body[c])
+  if ("instrumento_diseno" in body && !("instrumento_diseño" in out)) {
+    out["instrumento_diseño"] = vacioANull(body.instrumento_diseno)
+  }
+  if ("ISD" in body && !("isd" in out)) {
+    out.isd = vacioANull(body.ISD)
+  }
   for (const c of CAMPOS_BOOL) if (c in body) out[c] = body[c] === true || body[c] === "true" || body[c] === 1
   for (const c of CAMPOS_OTROS) if (c in body) out[c] = vacioANull(body[c])
   return out
@@ -242,6 +266,7 @@ exports.prefill = async (req, res) => {
 
 exports.listar = async (req, res) => {
   try {
+    await asegurarColumnas()
     const u = await contextoUsuario(req)
     if (!u) return res.status(401).json({ error: "Usuario no válido." })
 
@@ -270,7 +295,7 @@ exports.listar = async (req, res) => {
 
     const [datos, total] = await Promise.all([
       pool.query(
-        `SELECT pp.id, pp.nombre, pp.clave_programatica, pp.modalidad_programatica, pp.ejercicio_fiscal,
+        `SELECT pp.id, pp.nombre, pp.clave_programatica, pp.modalidad_programatica, pp.instrumento_diseño, pp.isd, pp.ejercicio_fiscal,
                 pp.estatus, pp.dependency_id, d.name AS dependencia, pp.unidad_responsable,
                 pp.fecha_elaboracion, pp.updated_at
            FROM programas_presupuestarios pp
@@ -298,6 +323,7 @@ exports.listar = async (req, res) => {
 
 exports.obtener = async (req, res) => {
   try {
+    await asegurarColumnas()
     const u = await contextoUsuario(req)
     if (!u) return res.status(401).json({ error: "Usuario no válido." })
 
@@ -316,6 +342,7 @@ exports.obtener = async (req, res) => {
 
 
 exports.crear = async (req, res) => {
+  await asegurarColumnas()
   const client = await pool.connect()
   try {
     const u = await contextoUsuario(req)
@@ -361,6 +388,7 @@ exports.crear = async (req, res) => {
 
 
 exports.actualizar = async (req, res) => {
+  await asegurarColumnas()
   const client = await pool.connect()
   try {
     const u = await contextoUsuario(req)
