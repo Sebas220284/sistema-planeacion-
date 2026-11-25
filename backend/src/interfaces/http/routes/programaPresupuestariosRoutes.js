@@ -11,3 +11,4 @@ router.get("/:id/validacion", c.obtenerValidacion)
 router.put("/:id/validacion", c.guardarValidacion)
 
 module.exports = router
+
