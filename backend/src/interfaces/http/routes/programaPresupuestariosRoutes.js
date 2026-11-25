@@ -17,6 +17,10 @@ router.put("/:id/ficha", c.guardarFicha)
 router.get("/:id/validacion", c.obtenerValidacion)
 router.put("/:id/validacion", c.guardarValidacion)
 
+<<<<<<< HEAD
+module.exports = router
+
+=======
 // CRUD que usa el frontend actual (ProgramasPresupuestarios.jsx)
 router.get("/", c.listar)
 router.get("/:id", c.obtener)
@@ -26,3 +30,4 @@ router.patch("/:id/estatus", c.cambiarEstatus)
 router.delete("/:id", c.eliminar)
 
 module.exports = router
+>>>>>>> 170d75d74338699089caf1962513cd981f54076d
