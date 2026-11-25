@@ -9,5 +9,6 @@ router.get("/cip/reporte2", ctrl.reporte2)
 router.get("/cip/reporteLineasAccion", ctrl.reporteLineasAccion)
 
 router.get("/cip/reportePorPrograma", ctrl.reportePorPrograma)
+router.get("/cip/reporteProyectosActividades", ctrl.reporteProyectosActividades)
 
 module.exports = router

@@ -8,24 +8,302 @@ const ROL_DEPENDENCIA = "dependencias"
 const ROLES_TODAS_DEPENDENCIAS = ["admin", "planeacion", "planeacion_estrategica"] // editan cualquier programa
 const ROLES_DEPENDENCIA = [ROL_DEPENDENCIA]
 
-// Asegura que existan las columnas instrumento_diseño e isd (las usa el frontend).
+// Asegura que exista la tabla pp_identificacion_general y las columnas instrumento_diseno e isd.
 let _columnasAseguradas = null
 function asegurarColumnas() {
   if (!_columnasAseguradas) {
     _columnasAseguradas = pool
       .query(
         `ALTER TABLE programas_presupuestarios
-           ADD COLUMN IF NOT EXISTS instrumento_diseño TEXT,
-           ADD COLUMN IF NOT EXISTS isd TEXT;`
+           ADD COLUMN IF NOT EXISTS instrumento_diseno TEXT,
+           ADD COLUMN IF NOT EXISTS isd VARCHAR(10);
+
+         CREATE TABLE IF NOT EXISTS pp_identificacion_general (
+           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+           programa_id UUID UNIQUE REFERENCES programas_presupuestarios(id) ON DELETE CASCADE,
+           nombre TEXT NOT NULL,
+           clave_programatica TEXT,
+           modalidad_programatica TEXT,
+           dependency_id UUID NOT NULL REFERENCES dependencies(id) ON DELETE RESTRICT,
+           unidad_responsable TEXT,
+           area_ejecutora TEXT,
+           ejercicio_fiscal INTEGER NOT NULL CHECK (ejercicio_fiscal BETWEEN 2024 AND 2100),
+           fecha_elaboracion DATE,
+           responsable_integracion TEXT,
+           cargo TEXT,
+           correo_institucional TEXT,
+           telefono_institucional TEXT,
+           instrumento_diseno TEXT,
+           isd VARCHAR(10),
+           estatus TEXT NOT NULL DEFAULT 'borrador' CHECK (estatus IN ('borrador', 'en_revision', 'validado', 'rechazado')),
+           created_by UUID REFERENCES users(id),
+           updated_by UUID REFERENCES users(id),
+           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         );
+
+         CREATE TABLE IF NOT EXISTS pp_vinculacion_estrategica (
+           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+           programa_id UUID UNIQUE NOT NULL REFERENCES programas_presupuestarios(id) ON DELETE CASCADE,
+           planning_template_id UUID REFERENCES planning_templates(id) ON DELETE SET NULL,
+           strategy_id UUID REFERENCES strategies(id) ON DELETE SET NULL,
+           eje_rector TEXT,
+           eje_transversal TEXT,
+           politica_publica TEXT,
+           objetivo_estrategico TEXT,
+           estrategia TEXT,
+           linea_accion TEXT,
+           ods TEXT,
+           instrumento_pnd TEXT,
+           instrumento_ped TEXT,
+           programa_derivado TEXT,
+           objetivo_vinculado TEXT,
+           contribucion TEXT,
+           created_by UUID REFERENCES users(id),
+           updated_by UUID REFERENCES users(id),
+           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         );
+
+         CREATE TABLE IF NOT EXISTS pp_problema_publico (
+           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+           programa_id UUID UNIQUE NOT NULL REFERENCES programas_presupuestarios(id) ON DELETE CASCADE,
+           problema_publico_d TEXT,
+           poblacion_afectada TEXT,
+           ubicacion_territorial TEXT,
+           magnitud NUMERIC,
+           unidad_medida TEXT,
+           fuentes_informacion TEXT,
+           periodo VARCHAR(50),
+           antecedentes TEXT,
+           causas_preliminares TEXT,
+           efectos_preliminares TEXT,
+           justificacion TEXT,
+           created_by UUID REFERENCES users(id),
+           updated_by UUID REFERENCES users(id),
+           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+         );`
       )
       .catch((err) => {
         _columnasAseguradas = null
-        console.error("[PP] Error asegurando columnas instrumento_diseño/isd:", err)
+        console.error("[PP] Error asegurando pp_identificacion_general / columnas:", err)
       })
   }
   return _columnasAseguradas
 }
 asegurarColumnas()
+
+async function sincronizarIdentificacionGeneral(client, programaId, userId) {
+  const { rows } = await client.query(
+    `SELECT id, nombre, clave_programatica, modalidad_programatica, dependency_id,
+            unidad_responsable, area_ejecutora, ejercicio_fiscal, fecha_elaboracion,
+            responsable_integracion, cargo, correo_institucional, telefono_institucional,
+            instrumento_diseno, isd, estatus
+       FROM programas_presupuestarios
+      WHERE id = $1`,
+    [programaId]
+  )
+  if (!rows[0]) return
+  const p = rows[0]
+  const isdVal = p.isd != null ? String(p.isd).slice(0, 10) : null
+  await client.query(
+    `INSERT INTO pp_identificacion_general (
+       id, programa_id, nombre, clave_programatica, modalidad_programatica,
+       dependency_id, unidad_responsable, area_ejecutora, ejercicio_fiscal, fecha_elaboracion,
+       responsable_integracion, cargo, correo_institucional, telefono_institucional,
+       instrumento_diseno, isd, estatus, created_by, updated_by, updated_at
+     ) VALUES (
+       $1, $1, $2, $3, $4,
+       $5, $6, $7, $8, $9,
+       $10, $11, $12, $13,
+       $14, $15, $16, $17, $17, NOW()
+     )
+     ON CONFLICT (programa_id) DO UPDATE SET
+       nombre = EXCLUDED.nombre,
+       clave_programatica = EXCLUDED.clave_programatica,
+       modalidad_programatica = EXCLUDED.modalidad_programatica,
+       dependency_id = EXCLUDED.dependency_id,
+       unidad_responsable = EXCLUDED.unidad_responsable,
+       area_ejecutora = EXCLUDED.area_ejecutora,
+       ejercicio_fiscal = EXCLUDED.ejercicio_fiscal,
+       fecha_elaboracion = EXCLUDED.fecha_elaboracion,
+       responsable_integracion = EXCLUDED.responsable_integracion,
+       cargo = EXCLUDED.cargo,
+       correo_institucional = EXCLUDED.correo_institucional,
+       telefono_institucional = EXCLUDED.telefono_institucional,
+       instrumento_diseno = EXCLUDED.instrumento_diseno,
+       isd = EXCLUDED.isd,
+       estatus = EXCLUDED.estatus,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = NOW()`,
+    [
+      p.id, p.nombre, p.clave_programatica, p.modalidad_programatica,
+      p.dependency_id, p.unidad_responsable, p.area_ejecutora, p.ejercicio_fiscal, p.fecha_elaboracion,
+      p.responsable_integracion, p.cargo, p.correo_institucional, p.telefono_institucional,
+      p.instrumento_diseno, isdVal, p.estatus, userId || null
+    ]
+  )
+}
+
+const CAMPOS_VINCULACION = [
+  "planning_template_id", "strategy_id",
+  "eje_rector", "eje_transversal", "politica_publica", "objetivo_estrategico",
+  "estrategia", "linea_accion", "ods", "instrumento_pnd", "instrumento_ped",
+  "programa_derivado", "objetivo_vinculado", "contribucion"
+]
+
+function extraerVinculacion(body) {
+  const b = body || {}
+  const out = {}
+  for (const c of CAMPOS_VINCULACION) {
+    if (c in b) out[c] = vacio(b[c])
+  }
+  if ("instrumento_nacional_planeacion" in b && !("instrumento_pnd" in out)) {
+    out.instrumento_pnd = vacio(b.instrumento_nacional_planeacion)
+  }
+  if ("instrumento_estatal_planeacion" in b && !("instrumento_ped" in out)) {
+    out.instrumento_ped = vacio(b.instrumento_estatal_planeacion)
+  }
+  return out
+}
+
+async function sincronizarVinculacionEstrategica(client, programaId, vincInput, userId) {
+  if (!vincInput || Object.keys(vincInput).length === 0) return
+
+  const prevRes = await client.query(
+    `SELECT planning_template_id, strategy_id, eje_rector, eje_transversal, politica_publica,
+            objetivo_estrategico, estrategia, linea_accion, ods, instrumento_pnd, instrumento_ped,
+            programa_derivado, objetivo_vinculado, contribucion
+       FROM pp_vinculacion_estrategica
+      WHERE programa_id = $1`,
+    [programaId]
+  )
+  const prev = prevRes.rows[0] || {}
+  const merged = {}
+  for (const c of CAMPOS_VINCULACION) {
+    merged[c] = (c in vincInput) ? vincInput[c] : (prev[c] ?? null)
+  }
+
+  await client.query(
+    `INSERT INTO pp_vinculacion_estrategica (
+       programa_id, planning_template_id, strategy_id,
+       eje_rector, eje_transversal, politica_publica, objetivo_estrategico,
+       estrategia, linea_accion, ods, instrumento_pnd, instrumento_ped,
+       programa_derivado, objetivo_vinculado, contribucion,
+       created_by, updated_by, updated_at
+     ) VALUES (
+       $1, $2, $3,
+       $4, $5, $6, $7,
+       $8, $9, $10, $11, $12,
+       $13, $14, $15,
+       $16, $16, NOW()
+     )
+     ON CONFLICT (programa_id) DO UPDATE SET
+       planning_template_id = EXCLUDED.planning_template_id,
+       strategy_id = EXCLUDED.strategy_id,
+       eje_rector = EXCLUDED.eje_rector,
+       eje_transversal = EXCLUDED.eje_transversal,
+       politica_publica = EXCLUDED.politica_publica,
+       objetivo_estrategico = EXCLUDED.objetivo_estrategico,
+       estrategia = EXCLUDED.estrategia,
+       linea_accion = EXCLUDED.linea_accion,
+       ods = EXCLUDED.ods,
+       instrumento_pnd = EXCLUDED.instrumento_pnd,
+       instrumento_ped = EXCLUDED.instrumento_ped,
+       programa_derivado = EXCLUDED.programa_derivado,
+       objetivo_vinculado = EXCLUDED.objetivo_vinculado,
+       contribucion = EXCLUDED.contribucion,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = NOW()`,
+    [
+      programaId, merged.planning_template_id, merged.strategy_id,
+      merged.eje_rector, merged.eje_transversal, merged.politica_publica, merged.objetivo_estrategico,
+      merged.estrategia, merged.linea_accion, merged.ods, merged.instrumento_pnd, merged.instrumento_ped,
+      merged.programa_derivado, merged.objetivo_vinculado, merged.contribucion,
+      userId || null
+    ]
+  )
+}
+
+const CAMPOS_PROBLEMA_PUBLICO = [
+  "problema_publico_d", "poblacion_afectada", "ubicacion_territorial",
+  "magnitud", "unidad_medida", "fuentes_informacion", "periodo",
+  "antecedentes", "causas_preliminares", "efectos_preliminares", "justificacion"
+]
+
+function extraerProblemaPublico(body) {
+  const b = body || {}
+  const out = {}
+  for (const c of CAMPOS_PROBLEMA_PUBLICO) {
+    if (c in b) {
+      out[c] = c === "magnitud" ? num(b[c]) : vacio(b[c])
+    }
+  }
+  if ("problematica_publica" in b && !("problema_publico_d" in out)) out.problema_publico_d = vacio(b.problematica_publica)
+  if ("poblacion_area_afectada" in b && !("poblacion_afectada" in out)) out.poblacion_afectada = vacio(b.poblacion_area_afectada)
+  if ("magnitud_unidad_medida" in b && !("unidad_medida" in out)) out.unidad_medida = vacio(b.magnitud_unidad_medida)
+  if ("fuente_informacion" in b && !("fuentes_informacion" in out)) out.fuentes_informacion = vacio(b.fuente_informacion)
+  if ("anio_periodo_diagnostico" in b && !("periodo" in out)) {
+    const p = vacio(b.anio_periodo_diagnostico)
+    out.periodo = p == null ? null : String(p)
+  }
+  if ("justificacion_intervencion" in b && !("justificacion" in out)) out.justificacion = vacio(b.justificacion_intervencion)
+  return out
+}
+
+async function sincronizarProblemaPublico(client, programaId, probInput, userId) {
+  if (!probInput || Object.keys(probInput).length === 0) return
+
+  const prevRes = await client.query(
+    `SELECT problema_publico_d, poblacion_afectada, ubicacion_territorial,
+            magnitud, unidad_medida, fuentes_informacion, periodo,
+            antecedentes, causas_preliminares, efectos_preliminares, justificacion
+       FROM pp_problema_publico
+      WHERE programa_id = $1`,
+    [programaId]
+  )
+  const prev = prevRes.rows[0] || {}
+  const merged = {}
+  for (const c of CAMPOS_PROBLEMA_PUBLICO) {
+    merged[c] = (c in probInput) ? probInput[c] : (prev[c] ?? null)
+  }
+  if (Number.isNaN(merged.magnitud)) merged.magnitud = null
+
+  await client.query(
+    `INSERT INTO pp_problema_publico (
+       programa_id, problema_publico_d, poblacion_afectada, ubicacion_territorial,
+       magnitud, unidad_medida, fuentes_informacion, periodo,
+       antecedentes, causas_preliminares, efectos_preliminares, justificacion,
+       created_by, updated_by, updated_at
+     ) VALUES (
+       $1, $2, $3, $4,
+       $5, $6, $7, $8,
+       $9, $10, $11, $12,
+       $13, $13, NOW()
+     )
+     ON CONFLICT (programa_id) DO UPDATE SET
+       problema_publico_d = EXCLUDED.problema_publico_d,
+       poblacion_afectada = EXCLUDED.poblacion_afectada,
+       ubicacion_territorial = EXCLUDED.ubicacion_territorial,
+       magnitud = EXCLUDED.magnitud,
+       unidad_medida = EXCLUDED.unidad_medida,
+       fuentes_informacion = EXCLUDED.fuentes_informacion,
+       periodo = EXCLUDED.periodo,
+       antecedentes = EXCLUDED.antecedentes,
+       causas_preliminares = EXCLUDED.causas_preliminares,
+       efectos_preliminares = EXCLUDED.efectos_preliminares,
+       justificacion = EXCLUDED.justificacion,
+       updated_by = EXCLUDED.updated_by,
+       updated_at = NOW()`,
+    [
+      programaId, merged.problema_publico_d, merged.poblacion_afectada, merged.ubicacion_territorial,
+      merged.magnitud, merged.unidad_medida, merged.fuentes_informacion, merged.periodo,
+      merged.antecedentes, merged.causas_preliminares, merged.efectos_preliminares, merged.justificacion,
+      userId || null
+    ]
+  )
+}
 
 async function contextoUsuario(req) {
   const id = req.user?.id || req.user?.userId || req.user?.sub
@@ -44,6 +322,7 @@ const TEXTO = [
   "unidades_responsables_participantes", "instrumento_diseno", "isd",
   "responsable_integracion", "cargo", "correo_institucional", "telefono_institucional",
   "eje_rector", "eje_transversal", "politica_publica", "objetivo_estrategico", "estrategia", "linea_accion", "ods",
+  "instrumento_nacional_planeacion", "instrumento_estatal_planeacion",
   "instrumento_nacional_planeacion", "instrumento_estatal_planeacion",
   "objetivo_institucional", "resultado_esperado", "contribucion_programa",
   "problematica_publica", "poblacion_area_afectada", "ubicacion_territorial", "magnitud_unidad_medida",
@@ -98,12 +377,12 @@ function extraerCampos(b) {
   for (const c of NUMEROS) if (c in b) o[c] = num(b[c])
   for (const c of BOOL) if (c in b) o[c] = bool(b[c])
   for (const c of OTROS) if (c in b) o[c] = vacio(b[c])
-  // La columna real en BD es instrumento_diseño (con ñ), la misma que usa el CRUD y el frontend.
-  if ("instrumento_diseno" in o) {
-    if (!("instrumento_diseño" in b)) o["instrumento_diseño"] = o.instrumento_diseno
-    delete o.instrumento_diseno
+  if ("instrumento_diseño" in b && !("instrumento_diseno" in o)) {
+    o.instrumento_diseno = vacio(b["instrumento_diseño"])
   }
-  if ("instrumento_diseño" in b) o["instrumento_diseño"] = vacio(b["instrumento_diseño"])
+  if ("ISD" in b && !("isd" in o)) {
+    o.isd = vacio(b.ISD)
+  }
   return o
 }
 
@@ -183,6 +462,7 @@ function validar(campos, h) {
   if (campos.anio_periodo_diagnostico != null && (!Number.isInteger(campos.anio_periodo_diagnostico) || campos.anio_periodo_diagnostico < 2000 || campos.anio_periodo_diagnostico > 2100)) e.push("Año o periodo del diagnóstico inválido.")
   if (campos.tipo_gasto && !TIPO_GASTO.includes(campos.tipo_gasto)) e.push(`Tipo de gasto inválido. Usa: ${TIPO_GASTO.join(", ")}.`)
   if (campos.correo_institucional && !/^\S+@\S+\.\S+$/.test(campos.correo_institucional)) e.push("El correo institucional no tiene formato válido.")
+  if (campos.isd && String(campos.isd).length > 10) e.push("El campo ISD no puede exceder los 10 caracteres.")
 
   if (h.objetivos_especificos?.length > 5) e.push("Máximo 5 objetivos específicos.")
   if (h.bienes_servicios?.length > 5) e.push("Máximo 5 bienes o servicios.")
@@ -360,8 +640,49 @@ exports.lineasDisponibles = async (req, res) => {
 
 async function cargarFicha(id) {
   const { rows } = await pool.query(
-    `SELECT pp.*, d.name AS dependencia FROM programas_presupuestarios pp
-       JOIN dependencies d ON d.id = pp.dependency_id WHERE pp.id = $1`, [id])
+    `SELECT pp.*,
+            COALESCE(ig.nombre, pp.nombre) AS nombre,
+            COALESCE(ig.clave_programatica, pp.clave_programatica) AS clave_programatica,
+            COALESCE(ig.modalidad_programatica, pp.modalidad_programatica) AS modalidad_programatica,
+            COALESCE(ig.unidad_responsable, pp.unidad_responsable) AS unidad_responsable,
+            COALESCE(ig.area_ejecutora, pp.area_ejecutora) AS area_ejecutora,
+            COALESCE(ig.fecha_elaboracion, pp.fecha_elaboracion) AS fecha_elaboracion,
+            COALESCE(ig.responsable_integracion, pp.responsable_integracion) AS responsable_integracion,
+            COALESCE(ig.cargo, pp.cargo) AS cargo,
+            COALESCE(ig.correo_institucional, pp.correo_institucional) AS correo_institucional,
+            COALESCE(ig.telefono_institucional, pp.telefono_institucional) AS telefono_institucional,
+            COALESCE(ig.instrumento_diseno, pp.instrumento_diseno) AS instrumento_diseno,
+            COALESCE(ig.isd, pp.isd) AS isd,
+            COALESCE(ve.eje_rector, pp.eje_rector) AS eje_rector,
+            COALESCE(ve.eje_transversal, pp.eje_transversal) AS eje_transversal,
+            COALESCE(ve.politica_publica, pp.politica_publica) AS politica_publica,
+            COALESCE(ve.objetivo_estrategico, pp.objetivo_estrategico) AS objetivo_estrategico,
+            COALESCE(ve.estrategia, pp.estrategia) AS estrategia,
+            COALESCE(ve.linea_accion, pp.linea_accion) AS linea_accion,
+            COALESCE(ve.ods, pp.ods) AS ods,
+            COALESCE(ve.instrumento_pnd, pp.instrumento_nacional_planeacion) AS instrumento_pnd,
+            COALESCE(ve.instrumento_ped, pp.instrumento_estatal_planeacion) AS instrumento_ped,
+            ve.programa_derivado AS programa_derivado,
+            ve.objetivo_vinculado AS objetivo_vinculado,
+            ve.contribucion AS contribucion,
+            COALESCE(pr.problema_publico_d, pp.problematica_publica) AS problema_publico_d,
+            COALESCE(pr.poblacion_afectada, pp.poblacion_area_afectada) AS poblacion_afectada,
+            COALESCE(pr.ubicacion_territorial, pp.ubicacion_territorial) AS ubicacion_territorial,
+            COALESCE(pr.magnitud, pp.magnitud) AS magnitud,
+            COALESCE(pr.unidad_medida, pp.magnitud_unidad_medida) AS unidad_medida,
+            COALESCE(pr.fuentes_informacion, pp.fuente_informacion) AS fuentes_informacion,
+            COALESCE(pr.periodo, pp.anio_periodo_diagnostico::text) AS periodo,
+            COALESCE(pr.antecedentes, pp.antecedentes) AS antecedentes,
+            COALESCE(pr.causas_preliminares, pp.causas_preliminares) AS causas_preliminares,
+            COALESCE(pr.efectos_preliminares, pp.efectos_preliminares) AS efectos_preliminares,
+            COALESCE(pr.justificacion, pp.justificacion_intervencion) AS justificacion,
+            d.name AS dependencia
+       FROM programas_presupuestarios pp
+       LEFT JOIN pp_identificacion_general ig ON ig.programa_id = pp.id
+       LEFT JOIN pp_vinculacion_estrategica ve ON ve.programa_id = pp.id
+       LEFT JOIN pp_problema_publico pr ON pr.programa_id = pp.id
+       JOIN dependencies d ON d.id = pp.dependency_id
+      WHERE pp.id = $1`, [id])
   if (!rows[0]) return null
   const q = (sql) => pool.query(sql, [id]).then((r) => r.rows)
   const [der, obj, bys, alt, ind, mir, met, acc, val, resp, prelim] = await Promise.all([
@@ -388,7 +709,7 @@ async function cargarFicha(id) {
   const orden = Object.fromEntries(RESPONSABILIDADES.map((r, i) => [r, i]))
   return {
     ...rows[0],
-    instrumento_diseno: rows[0]["instrumento_diseño"] ?? null,
+    instrumento_diseno: rows[0].instrumento_diseno ?? null,
     vinculacion,
     programas_derivados: der, objetivos_especificos: obj, bienes_servicios: bys,
     alternativas: alt, indicadores_registro: ind, mir, estructura_analitica: estructura,
@@ -465,6 +786,9 @@ exports.guardarFicha = async (req, res) => {
     sets.push(`updated_by = $${vals.length + 1}`, "updated_at = NOW()")
     vals.push(u.id, req.params.id)
     await client.query(`UPDATE programas_presupuestarios SET ${sets.join(", ")} WHERE id = $${vals.length}`, vals)
+    await sincronizarIdentificacionGeneral(client, req.params.id, u.id)
+    await sincronizarVinculacionEstrategica(client, req.params.id, extraerVinculacion(body), u.id)
+    await sincronizarProblemaPublico(client, req.params.id, extraerProblemaPublico(body), u.id)
     await guardarHijos(client, req.params.id, hijos)
     await client.query("COMMIT")
 
@@ -544,6 +868,8 @@ exports.guardarValidacion = async (req, res) => {
     if (resultado) {
       await client.query("UPDATE programas_presupuestarios SET estatus=$1, updated_by=$2, updated_at=NOW() WHERE id=$3",
         [RESULTADO_A_ESTATUS[resultado], u.id, req.params.id])
+      await client.query("UPDATE pp_identificacion_general SET estatus=$1, updated_by=$2, updated_at=NOW() WHERE programa_id=$3",
+        [RESULTADO_A_ESTATUS[resultado], u.id, req.params.id])
     }
     await client.query("COMMIT")
     const f = await cargarFicha(req.params.id)
@@ -568,9 +894,11 @@ exports.guardarValidacion = async (req, res) => {
 // =====================================================================
 
 const CAMPOS_TEXTO_CRUD = [
-  "nombre", "clave_programatica", "modalidad_programatica", "instrumento_diseño", "isd", "unidad_responsable", "area_ejecutora",
+  "nombre", "clave_programatica", "modalidad_programatica", "instrumento_diseno", "isd", "unidad_responsable", "area_ejecutora",
   "responsable_integracion", "cargo", "correo_institucional", "telefono_institucional",
   "problematica_publica", "diagnostico_general", "justificacion_intervencion",
+  "poblacion_area_afectada", "ubicacion_territorial", "magnitud_unidad_medida",
+  "antecedentes", "causas_preliminares", "efectos_preliminares",
   "eje_rector", "eje_transversal", "politica_publica", "objetivo_estrategico", "estrategia", "linea_accion", "ods",
   "objetivo_institucional", "resultado_esperado", "contribucion_programa",
   "objetivo_general",
@@ -579,7 +907,7 @@ const CAMPOS_TEXTO_CRUD = [
   "supuesto_estrategico", "supuesto_operativo", "supuesto_financiero", "supuesto_externo",
 ]
 const CAMPOS_BOOL_CRUD = ["usa_mir", "usa_fime", "usa_fiseg"]
-const CAMPOS_OTROS_CRUD = ["dependency_id", "strategy_id", "ejercicio_fiscal", "fecha_elaboracion", "estatus"]
+const CAMPOS_OTROS_CRUD = ["dependency_id", "strategy_id", "planning_template_id", "ejercicio_fiscal", "fecha_elaboracion", "estatus"]
 
 const DIMENSIONES = ["Eficacia", "Eficiencia", "Calidad", "Economía"]
 const ESTATUS = ["borrador", "en_revision", "validado", "rechazado"]
@@ -589,11 +917,31 @@ const puedeEscribir = (u) => ROLES_TODAS_DEPENDENCIAS.includes(u.rol) || ROLES_D
 function extraerCamposCrud(body) {
   const out = {}
   for (const c of CAMPOS_TEXTO_CRUD) if (c in body) out[c] = vacio(body[c])
-  if ("instrumento_diseno" in body && !("instrumento_diseño" in out)) {
-    out["instrumento_diseño"] = vacio(body.instrumento_diseno)
+  if ("instrumento_diseño" in body && !("instrumento_diseno" in out)) {
+    out.instrumento_diseno = vacio(body["instrumento_diseño"])
   }
   if ("ISD" in body && !("isd" in out)) {
     out.isd = vacio(body.ISD)
+  }
+  if ("instrumento_pnd" in body && !("instrumento_nacional_planeacion" in out)) {
+    out.instrumento_nacional_planeacion = vacio(body.instrumento_pnd)
+  }
+  if ("instrumento_ped" in body && !("instrumento_estatal_planeacion" in out)) {
+    out.instrumento_estatal_planeacion = vacio(body.instrumento_ped)
+  }
+  if ("problema_publico_d" in body && !("problematica_publica" in out)) out.problematica_publica = vacio(body.problema_publico_d)
+  if ("poblacion_afectada" in body && !("poblacion_area_afectada" in out)) out.poblacion_area_afectada = vacio(body.poblacion_afectada)
+  if ("unidad_medida" in body && !("magnitud_unidad_medida" in out)) out.magnitud_unidad_medida = vacio(body.unidad_medida)
+  if ("fuentes_informacion" in body && !("fuente_informacion" in out)) out.fuente_informacion = vacio(body.fuentes_informacion)
+  if ("justificacion" in body && !("justificacion_intervencion" in out)) out.justificacion_intervencion = vacio(body.justificacion)
+  if ("magnitud" in body) out.magnitud = num(body.magnitud)
+  if ("periodo" in body) {
+    const pStr = vacio(body.periodo)
+    if (pStr && /^\d{4}$/.test(String(pStr))) {
+      out.anio_periodo_diagnostico = Number(pStr)
+    } else if (pStr === null) {
+      out.anio_periodo_diagnostico = null
+    }
   }
   for (const c of CAMPOS_BOOL_CRUD) if (c in body) out[c] = body[c] === true || body[c] === "true" || body[c] === 1
   for (const c of CAMPOS_OTROS_CRUD) if (c in body) out[c] = vacio(body[c])
@@ -617,6 +965,14 @@ function validarCrud(campos, hijos, esCreacion) {
   if (campos.estatus && !ESTATUS.includes(campos.estatus)) errores.push("Estatus inválido.")
   if (campos.correo_institucional && !/^\S+@\S+\.\S+$/.test(campos.correo_institucional)) {
     errores.push("El correo institucional no tiene formato válido.")
+  }
+  if (campos.isd && String(campos.isd).length > 10) {
+    errores.push("El campo ISD no puede exceder los 10 caracteres.")
+  }
+  if (campos.magnitud !== undefined && campos.magnitud !== null) {
+    if (Number.isNaN(campos.magnitud) || campos.magnitud < 0) {
+      errores.push("La magnitud debe ser un número mayor o igual a cero.")
+    }
   }
 
   if (hijos.objetivos_especificos && hijos.objetivos_especificos.length > 5) {
@@ -718,8 +1074,49 @@ async function guardarHijosCrud(client, programaId, h) {
 
 async function cargarCompleto(programaId) {
   const { rows } = await pool.query(
-    `SELECT pp.*, d.name AS dependencia
+    `SELECT pp.*,
+            COALESCE(ig.nombre, pp.nombre) AS nombre,
+            COALESCE(ig.clave_programatica, pp.clave_programatica) AS clave_programatica,
+            COALESCE(ig.modalidad_programatica, pp.modalidad_programatica) AS modalidad_programatica,
+            COALESCE(ig.unidad_responsable, pp.unidad_responsable) AS unidad_responsable,
+            COALESCE(ig.area_ejecutora, pp.area_ejecutora) AS area_ejecutora,
+            COALESCE(ig.fecha_elaboracion, pp.fecha_elaboracion) AS fecha_elaboracion,
+            COALESCE(ig.responsable_integracion, pp.responsable_integracion) AS responsable_integracion,
+            COALESCE(ig.cargo, pp.cargo) AS cargo,
+            COALESCE(ig.correo_institucional, pp.correo_institucional) AS correo_institucional,
+            COALESCE(ig.telefono_institucional, pp.telefono_institucional) AS telefono_institucional,
+            COALESCE(ig.instrumento_diseno, pp.instrumento_diseno) AS instrumento_diseno,
+            COALESCE(ig.isd, pp.isd) AS isd,
+            COALESCE(ve.planning_template_id, pp.planning_template_id) AS planning_template_id,
+            COALESCE(ve.strategy_id, pp.strategy_id) AS strategy_id,
+            COALESCE(ve.eje_rector, pp.eje_rector) AS eje_rector,
+            COALESCE(ve.eje_transversal, pp.eje_transversal) AS eje_transversal,
+            COALESCE(ve.politica_publica, pp.politica_publica) AS politica_publica,
+            COALESCE(ve.objetivo_estrategico, pp.objetivo_estrategico) AS objetivo_estrategico,
+            COALESCE(ve.estrategia, pp.estrategia) AS estrategia,
+            COALESCE(ve.linea_accion, pp.linea_accion) AS linea_accion,
+            COALESCE(ve.ods, pp.ods) AS ods,
+            COALESCE(ve.instrumento_pnd, pp.instrumento_nacional_planeacion) AS instrumento_pnd,
+            COALESCE(ve.instrumento_ped, pp.instrumento_estatal_planeacion) AS instrumento_ped,
+            ve.programa_derivado AS programa_derivado,
+            ve.objetivo_vinculado AS objetivo_vinculado,
+            ve.contribucion AS contribucion,
+            COALESCE(pr.problema_publico_d, pp.problematica_publica) AS problema_publico_d,
+            COALESCE(pr.poblacion_afectada, pp.poblacion_area_afectada) AS poblacion_afectada,
+            COALESCE(pr.ubicacion_territorial, pp.ubicacion_territorial) AS ubicacion_territorial,
+            COALESCE(pr.magnitud, pp.magnitud) AS magnitud,
+            COALESCE(pr.unidad_medida, pp.magnitud_unidad_medida) AS unidad_medida,
+            COALESCE(pr.fuentes_informacion, pp.fuente_informacion) AS fuentes_informacion,
+            COALESCE(pr.periodo, pp.anio_periodo_diagnostico::text) AS periodo,
+            COALESCE(pr.antecedentes, pp.antecedentes) AS antecedentes,
+            COALESCE(pr.causas_preliminares, pp.causas_preliminares) AS causas_preliminares,
+            COALESCE(pr.efectos_preliminares, pp.efectos_preliminares) AS efectos_preliminares,
+            COALESCE(pr.justificacion, pp.justificacion_intervencion) AS justificacion,
+            d.name AS dependencia
        FROM programas_presupuestarios pp
+       LEFT JOIN pp_identificacion_general ig ON ig.programa_id = pp.id
+       LEFT JOIN pp_vinculacion_estrategica ve ON ve.programa_id = pp.id
+       LEFT JOIN pp_problema_publico pr ON pr.programa_id = pp.id
        JOIN dependencies d ON d.id = pp.dependency_id
       WHERE pp.id = $1`,
     [programaId]
@@ -783,6 +1180,170 @@ exports.prefill = async (req, res) => {
 }
 
 
+exports.catalogos = async (req, res) => {
+  try {
+    const u = await contextoUsuario(req)
+    if (!u) return res.status(401).json({ error: "Usuario no válido." })
+
+    const [programasRes, depsRes] = await Promise.all([
+      pool.query(`SELECT id, clave, descripcion FROM cat_programas ORDER BY clave`),
+      pool.query(`
+        SELECT d.id, d.name, d.abreviatura
+          FROM dependencies d
+         WHERE d.id NOT IN (
+           SELECT dependency_id
+             FROM dep_agrupaciones
+            WHERE dependency_id != grupo_id
+         )
+         ORDER BY d.name
+      `),
+    ])
+
+    res.json({
+      programas: programasRes.rows,
+      dependencias: depsRes.rows,
+    })
+  } catch (e) {
+    console.error("[PP] catalogos:", e)
+    res.status(500).json({ error: "No se pudieron obtener los catálogos." })
+  }
+}
+
+exports.unidadesResponsables = async (req, res) => {
+  try {
+    await asegurarColumnas()
+    const u = await contextoUsuario(req)
+    if (!u) return res.status(401).json({ error: "Usuario no válido." })
+
+    const depId = req.params.dependency_id
+    if (!depId) return res.status(400).json({ error: "Indica dependency_id." })
+    if (!veTodo(u) && !esMisma(u, depId)) {
+      return res.status(403).json({ error: "Solo puedes consultar unidades responsables de tu dependencia." })
+    }
+
+    const { rows } = await pool.query(
+      `WITH deps_relacionadas AS (
+         SELECT $1::uuid AS id
+         UNION
+         SELECT dependency_id FROM dep_agrupaciones WHERE grupo_id = $1::uuid
+         UNION
+         SELECT grupo_id FROM dep_agrupaciones WHERE dependency_id = $1::uuid
+       ),
+       todas AS (
+         SELECT BTRIM(unidad_responsable) AS ur
+           FROM cip_proyectos
+          WHERE dependency_id IN (SELECT id FROM deps_relacionadas)
+            AND unidad_responsable IS NOT NULL
+            AND BTRIM(unidad_responsable) <> ''
+         UNION
+         SELECT BTRIM(unidad_responsable) AS ur
+           FROM pp_identificacion_general
+          WHERE dependency_id IN (SELECT id FROM deps_relacionadas)
+            AND unidad_responsable IS NOT NULL
+            AND BTRIM(unidad_responsable) <> ''
+       )
+       SELECT DISTINCT ON (LOWER(ur)) ur
+         FROM todas
+        ORDER BY LOWER(ur), LENGTH(ur) DESC`,
+      [depId]
+    )
+
+    let unidades = rows.map((r) => r.ur).sort((a, b) => a.localeCompare(b, "es"))
+
+    if (unidades.length === 0) {
+      const depRow = await pool.query("SELECT name FROM dependencies WHERE id = $1", [depId])
+      if (depRow.rows[0]?.name) unidades = [depRow.rows[0].name]
+    }
+
+    res.json({ unidades_responsables: unidades })
+  } catch (e) {
+    if (e.code === "22P02") return res.status(400).json({ error: "Identificador de dependencia inválido." })
+    console.error("[PP] unidadesResponsables:", e)
+    res.status(500).json({ error: "No se pudieron obtener las unidades responsables." })
+  }
+}
+
+exports.catalogosVinculacion = async (req, res) => {
+  try {
+    await asegurarColumnas()
+    const u = await contextoUsuario(req)
+    if (!u) return res.status(401).json({ error: "Usuario no válido." })
+
+    const depId = req.params.dependency_id
+    if (!depId) return res.status(400).json({ error: "Indica dependency_id." })
+    if (!veTodo(u) && !esMisma(u, depId)) {
+      return res.status(403).json({ error: "Solo puedes consultar vinculación de tu dependencia." })
+    }
+
+    const [pmdRows, ejesPmdRes, transvRes, odsRes, pndRes, pedRes] = await Promise.all([
+      pool.query(
+        `WITH deps_relacionadas AS (
+           SELECT $1::uuid AS id
+           UNION
+           SELECT dependency_id FROM dep_agrupaciones WHERE grupo_id = $1::uuid
+           UNION
+           SELECT grupo_id FROM dep_agrupaciones WHERE dependency_id = $1::uuid
+         )
+         SELECT
+           pt.id AS planning_template_id,
+           pt.strategy_id,
+           BTRIM(COALESCE(pt.pmd_eje, '')) AS eje_rector,
+           BTRIM(COALESCE(pt.pmd_politica_publica, '')) AS politica_publica,
+           BTRIM(COALESCE(pt.pmd_objetivo, '')) AS objetivo_estrategico,
+           BTRIM(COALESCE(pt.pmd_estrategia, s.name, '')) AS estrategia,
+           BTRIM(COALESCE(pt.lineas_accion, '')) AS linea_accion,
+           BTRIM(COALESCE(pt.nomenclatura, '')) AS nomenclatura
+         FROM planning_templates pt
+         LEFT JOIN strategies s ON s.id = pt.strategy_id
+         WHERE pt.dependency_id IN (SELECT id FROM deps_relacionadas)
+           AND (pt.pmd_eje IS NOT NULL OR pt.pmd_estrategia IS NOT NULL OR pt.lineas_accion IS NOT NULL)
+         UNION ALL
+         SELECT
+           NULL::uuid AS planning_template_id,
+           NULL::uuid AS strategy_id,
+           BTRIM(COALESCE(na.eje_pmd, '')) AS eje_rector,
+           BTRIM(COALESCE(na.politica_publica, '')) AS politica_publica,
+           BTRIM(COALESCE(na.objetivo, '')) AS objetivo_estrategico,
+           BTRIM(COALESCE(na.estrategia, '')) AS estrategia,
+           BTRIM(COALESCE(CASE WHEN la.id IS NOT NULL THEN CONCAT(la.nomenclatura, ' ', la.descripcion) ELSE '' END, '')) AS linea_accion,
+           BTRIM(COALESCE(la.nomenclatura, '')) AS nomenclatura
+         FROM nueva_alineacion na
+         LEFT JOIN lineas_accion la ON la.alineacion_id = na.id
+         WHERE na.dependencia_id IN (SELECT id FROM deps_relacionadas)
+         ORDER BY eje_rector, politica_publica, estrategia, nomenclatura`,
+        [depId]
+      ),
+      pool.query(`SELECT id, tipo_eje, nombre FROM pmd_ejes ORDER BY id`),
+      pool.query(
+        `SELECT 'PND' AS origen, id, tipo_eje, nombre
+           FROM pnd_ejes
+          WHERE tipo_eje ILIKE '%transversal%'
+         UNION ALL
+         SELECT 'PED' AS origen, id, tipo_eje, nombre
+           FROM ped_ejes
+          WHERE tipo_eje ILIKE '%transversal%'
+         ORDER BY origen, id`
+      ),
+      pool.query(`SELECT id, numero, codigo, nombre FROM ods_objetivos ORDER BY numero`),
+      pool.query(`SELECT id, tipo_eje, nombre FROM pnd_ejes ORDER BY id`),
+      pool.query(`SELECT id, tipo_eje, nombre FROM ped_ejes ORDER BY id`),
+    ])
+
+    res.json({
+      alineacion_pmd: pmdRows.rows,
+      ejes_rectores: ejesPmdRes.rows,
+      ejes_transversales: transvRes.rows,
+      ods: odsRes.rows,
+      pnd: pndRes.rows,
+      ped: pedRes.rows,
+    })
+  } catch (e) {
+    if (e.code === "22P02") return res.status(400).json({ error: "Identificador de dependencia inválido." })
+    console.error("[PP] catalogosVinculacion:", e)
+    res.status(500).json({ error: "No se pudieron obtener los catálogos de vinculación estratégica." })
+  }
+}
+
 exports.listar = async (req, res) => {
   try {
     await asegurarColumnas()
@@ -814,10 +1375,21 @@ exports.listar = async (req, res) => {
 
     const [datos, total] = await Promise.all([
       pool.query(
-        `SELECT pp.id, pp.nombre, pp.clave_programatica, pp.modalidad_programatica, pp.instrumento_diseño, pp.isd, pp.ejercicio_fiscal,
-                pp.estatus, pp.dependency_id, d.name AS dependencia, pp.unidad_responsable,
-                pp.fecha_elaboracion, pp.updated_at
+        `SELECT pp.id,
+                COALESCE(ig.nombre, pp.nombre) AS nombre,
+                COALESCE(ig.clave_programatica, pp.clave_programatica) AS clave_programatica,
+                COALESCE(ig.modalidad_programatica, pp.modalidad_programatica) AS modalidad_programatica,
+                COALESCE(ig.instrumento_diseno, pp.instrumento_diseno) AS instrumento_diseno,
+                COALESCE(ig.isd, pp.isd) AS isd,
+                COALESCE(ig.ejercicio_fiscal, pp.ejercicio_fiscal) AS ejercicio_fiscal,
+                COALESCE(ig.estatus, pp.estatus) AS estatus,
+                pp.dependency_id,
+                d.name AS dependencia,
+                COALESCE(ig.unidad_responsable, pp.unidad_responsable) AS unidad_responsable,
+                COALESCE(ig.fecha_elaboracion, pp.fecha_elaboracion) AS fecha_elaboracion,
+                COALESCE(ig.updated_at, pp.updated_at) AS updated_at
            FROM programas_presupuestarios pp
+           LEFT JOIN pp_identificacion_general ig ON ig.programa_id = pp.id
            JOIN dependencies d ON d.id = pp.dependency_id
            ${w}
           ORDER BY pp.ejercicio_fiscal DESC, d.name, pp.nombre
@@ -877,6 +1449,14 @@ exports.crear = async (req, res) => {
     }
     if (!ROLES_TODAS_DEPENDENCIAS.includes(u.rol)) campos.estatus = "borrador"
 
+    if (campos.nombre && !campos.clave_programatica) {
+      const cat = await pool.query(
+        "SELECT clave FROM cat_programas WHERE LOWER(BTRIM(descripcion)) = LOWER(BTRIM($1)) LIMIT 1",
+        [campos.nombre]
+      )
+      if (cat.rows[0]?.clave) campos.clave_programatica = cat.rows[0].clave
+    }
+
     const errores = validarCrud(campos, hijos, true)
     if (errores.length) return res.status(400).json({ error: errores[0], errores })
 
@@ -893,6 +1473,9 @@ exports.crear = async (req, res) => {
       vals
     )
     const id = ins.rows[0].id
+    await sincronizarIdentificacionGeneral(client, id, u.id)
+    await sincronizarVinculacionEstrategica(client, id, extraerVinculacion(req.body), u.id)
+    await sincronizarProblemaPublico(client, id, extraerProblemaPublico(req.body), u.id)
     await guardarHijosCrud(client, id, hijos)
     await client.query("COMMIT")
 
@@ -951,6 +1534,9 @@ exports.actualizar = async (req, res) => {
       `UPDATE programas_presupuestarios SET ${sets.join(", ")} WHERE id = $${vals.length}`,
       vals
     )
+    await sincronizarIdentificacionGeneral(client, req.params.id, u.id)
+    await sincronizarVinculacionEstrategica(client, req.params.id, extraerVinculacion(req.body), u.id)
+    await sincronizarProblemaPublico(client, req.params.id, extraerProblemaPublico(req.body), u.id)
     await guardarHijosCrud(client, req.params.id, hijos)
     await client.query("COMMIT")
 
@@ -981,6 +1567,11 @@ exports.cambiarEstatus = async (req, res) => {
       [estatus, u.id, req.params.id]
     )
     if (!r.rows[0]) return res.status(404).json({ error: "Programa presupuestario no encontrado." })
+    await pool.query(
+      `UPDATE pp_identificacion_general SET estatus = $1, updated_by = $2, updated_at = NOW()
+        WHERE programa_id = $3`,
+      [estatus, u.id, req.params.id]
+    )
     res.json(r.rows[0])
   } catch (e) {
     if (e.code === "22P02") return res.status(400).json({ error: "Identificador inválido." })

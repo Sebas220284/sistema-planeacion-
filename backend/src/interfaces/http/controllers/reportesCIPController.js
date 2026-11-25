@@ -637,3 +637,252 @@ exports.reportePorPrograma = async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 };
+
+const parseLineasCip = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((x) => String(x || "").trim()).filter(Boolean);
+  }
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return [];
+    if (s.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed)) {
+          return parsed.map((x) => String(x || "").trim()).filter(Boolean);
+        }
+      } catch (e) {}
+    }
+    if (s.startsWith("{") && s.endsWith("}")) {
+      const inner = s.slice(1, -1).trim();
+      if (!inner) return [];
+      return inner
+        .split('","')
+        .map((item) => item.replace(/^"|"$/g, "").trim())
+        .filter(Boolean);
+    }
+    return [s];
+  }
+  return [];
+};
+
+const normLinea = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+const codigoLinea = (s) => {
+  const m = String(s || "").match(/\b\d+(?:\.\d+){2,}\b/);
+  return m ? m[0] : null;
+};
+
+exports.reporteProyectosActividades = async (req, res) => {
+  try {
+    const { anio, estado, user_id } = req.query;
+    const params = [];
+    let cWhere = "WHERE 1=1";
+    let depFilter = "";
+
+    if (user_id) {
+      const userRes = await pool.query(
+        `SELECT r.name AS rol FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+        [user_id]
+      );
+      if (userRes.rows.length > 0 && userRes.rows[0].rol === "inversion_publica") {
+        params.push(user_id);
+        const idx = params.length;
+        cWhere += ` AND c.dependency_id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${idx})`;
+        depFilter = ` AND (
+          d.id IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${idx})
+          OR COALESCE(da.grupo_id, d.id) IN (SELECT dependency_id FROM user_dependencias_asignadas WHERE user_id = $${idx})
+        )`;
+      }
+    }
+
+    if (estado && String(estado).toLowerCase() !== "todos") {
+      if (String(estado).toLowerCase() === "proyeccion") {
+        cWhere += ` AND c.estado IN ('aprobado', 'enviado', 'rechazado')`;
+      } else {
+        params.push(estado);
+        cWhere += ` AND c.estado = $${params.length}`;
+      }
+    }
+
+    if (anio && String(anio).toLowerCase() !== "todos") {
+      params.push(Number(anio));
+      cWhere += ` AND c.anio = $${params.length}`;
+    }
+
+    const depParams = user_id && depFilter ? [user_id] : [];
+
+    const [depsRes, cipsRes, lineasRes] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT
+           COALESCE(da.grupo_id, d.id) AS dependency_id,
+           COALESCE(gd.name, d.name) AS dependencia_nombre
+         FROM dependencies d
+         LEFT JOIN dep_agrupaciones da ON da.dependency_id = d.id
+         LEFT JOIN dependencies gd ON gd.id = da.grupo_id
+         WHERE d.id NOT IN ('ec6cf929-712e-44de-99fa-316043716114', '768ac9b7-b895-4a0c-b00f-462114fbc82e')
+         ${depFilter}
+         ORDER BY COALESCE(gd.name, d.name) ASC`,
+        depParams
+      ),
+      pool.query(
+        `SELECT
+           c.id,
+           c.folio,
+           c.nombre_proyecto,
+           c.costo_total,
+           c.estado,
+           c.anio,
+           c.pmd_eje,
+           c.pmd_estrategia,
+           c.pmd_lineas_accion,
+           COALESCE(da.grupo_id, c.dependency_id) AS dependency_id,
+           COALESCE(gd.name, d.name) AS dependencia_nombre
+         FROM cip_proyectos c
+         LEFT JOIN dependencies d ON d.id = c.dependency_id
+         LEFT JOIN dep_agrupaciones da ON da.dependency_id = c.dependency_id
+         LEFT JOIN dependencies gd ON gd.id = da.grupo_id
+         ${cWhere}
+         ORDER BY COALESCE(gd.name, d.name) ASC, c.nombre_proyecto ASC`,
+        params
+      ),
+      pool.query(
+        `SELECT
+           pt.id,
+           COALESCE(da.grupo_id, pt.dependency_id) AS dependency_id,
+           COALESCE(gd.name, d.name) AS dependencia_nombre,
+           TRIM(pt.lineas_accion) AS linea_accion,
+           pt.pmd_eje,
+           pt.pmd_estrategia,
+           pt.ejercicio
+         FROM planning_templates pt
+         LEFT JOIN dependencies d ON d.id = pt.dependency_id
+         LEFT JOIN dep_agrupaciones da ON da.dependency_id = pt.dependency_id
+         LEFT JOIN dependencies gd ON gd.id = da.grupo_id
+         WHERE COALESCE(TRIM(pt.lineas_accion), '') <> ''
+           AND (
+             pt.ejercicio = (SELECT MAX(ejercicio) FROM planning_templates)
+             OR pt.ejercicio IS NULL
+           )
+         ORDER BY COALESCE(gd.name, d.name) ASC, TRIM(pt.lineas_accion) ASC`
+      ),
+    ]);
+
+    const depMap = new Map();
+    const ensureDep = (id, nombre) => {
+      const key = String(id || nombre || "sin_dep");
+      if (!depMap.has(key)) {
+        depMap.set(key, {
+          dependency_id: id || null,
+          dependencia_nombre: nombre || "Dependencia sin nombre",
+          proyectos: [],
+          _todasLineas: [],
+        });
+      }
+      return depMap.get(key);
+    };
+
+    for (const d of depsRes.rows) {
+      ensureDep(d.dependency_id, d.dependencia_nombre);
+    }
+
+    for (const c of cipsRes.rows) {
+      const dep = ensureDep(c.dependency_id, c.dependencia_nombre);
+      const lineasRelacionadas = parseLineasCip(c.pmd_lineas_accion);
+      dep.proyectos.push({
+        id: c.id,
+        folio: c.folio || null,
+        nombre_proyecto: c.nombre_proyecto || "Proyecto sin nombre",
+        costo_total: Number(c.costo_total || 0),
+        estado: c.estado || null,
+        anio: c.anio || null,
+        pmd_eje: c.pmd_eje || null,
+        pmd_estrategia: c.pmd_estrategia || null,
+        lineas_relacionadas: lineasRelacionadas,
+      });
+    }
+
+    const allowedDepIds = new Set(depsRes.rows.map((d) => String(d.dependency_id)));
+    for (const l of lineasRes.rows) {
+      if (user_id && depFilter && !allowedDepIds.has(String(l.dependency_id))) {
+        continue;
+      }
+      const dep = ensureDep(l.dependency_id, l.dependencia_nombre);
+      dep._todasLineas.push(l.linea_accion);
+    }
+
+    const resultado = [];
+    for (const dep of depMap.values()) {
+      const usedNorms = new Set();
+      const usedCodes = new Set();
+
+      for (const p of dep.proyectos) {
+        for (const lin of p.lineas_relacionadas) {
+          const n = normLinea(lin);
+          if (n) usedNorms.add(n);
+          const cod = codigoLinea(lin);
+          if (cod) usedCodes.add(cod);
+        }
+      }
+
+      const seenTemplateNorms = new Set();
+      const gastoCorriente = [];
+      for (const lin of dep._todasLineas) {
+        const n = normLinea(lin);
+        if (!n || seenTemplateNorms.has(n)) continue;
+        seenTemplateNorms.add(n);
+
+        const cod = codigoLinea(lin);
+        let estaRelacionada = usedNorms.has(n) || (cod && usedCodes.has(cod));
+        if (!estaRelacionada && n.length > 15) {
+          for (const u of usedNorms) {
+            if (u.length > 15 && (u.includes(n) || n.includes(u))) {
+              estaRelacionada = true;
+              break;
+            }
+          }
+        }
+
+        if (!estaRelacionada) {
+          gastoCorriente.push(lin);
+        }
+      }
+
+      if (dep.proyectos.length > 0 || gastoCorriente.length > 0) {
+        resultado.push({
+          dependency_id: dep.dependency_id,
+          dependencia_nombre: dep.dependencia_nombre,
+          total_proyectos: dep.proyectos.length,
+          total_lineas_cip: usedNorms.size,
+          total_gasto_corriente: gastoCorriente.length,
+          proyectos: dep.proyectos,
+          gasto_corriente: gastoCorriente,
+        });
+      }
+    }
+
+    resultado.sort((a, b) =>
+      String(a.dependencia_nombre || "").localeCompare(String(b.dependencia_nombre || ""), "es")
+    );
+
+    res.json({
+      reporte: "Relación de Proyectos CIP y Actividades (Gasto Corriente)",
+      generado: new Date().toISOString(),
+      filtros: {
+        anio: anio || "todos",
+        estado: estado || "todos",
+      },
+      dependencias: resultado,
+    });
+  } catch (e) {
+    console.error("Error en reporteProyectosActividades:", e);
+    res.status(500).json({ error: e.message });
+  }
+};
