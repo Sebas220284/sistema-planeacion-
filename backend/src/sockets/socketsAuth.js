@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken")
 const pool = require("../database/postgres")
 
 const ROLES_PLANEACION = ["admin", "planeacion"]
-const ROLES_INTERNOS   = ["admin", "planeacion", "planeacion_estrategica", "inversion_publica"]
+const ROLES_INTERNOS   = ["admin", "planeacion", "planeacion_estrategica", "inversion_publica", "viewer", "consulta_planeacion"]
 const ROLES_CHAT       = ["admin", "planeacion", "dependencias"]
 
 const modoEnforce = () => process.env.SOCKET_AUTH_MODE === "enforce"

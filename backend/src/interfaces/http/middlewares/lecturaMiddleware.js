@@ -1,16 +1,17 @@
 const pool = require("../../../database/postgres")
 
-const ROLES_SOLO_LECTURA = ["consulta_planeacion"]
+const ROLES_SOLO_LECTURA = ["viewer", "consulta_planeacion"]
 
 const ROLES_CONOCIDOS = [
-  "admin", "planeacion", "dependencias", "viewer",
+  "admin", "planeacion", "dependencias",
   "inversion_publica", "planeacion_estrategica", ...ROLES_SOLO_LECTURA
 ]
 
 const METODOS_LECTURA = ["GET", "HEAD", "OPTIONS"]
 
 
-const RUTAS_PERMITIDAS = ["/notificaciones", "/pdf"]
+// Rutas POST/PUT de solo consulta o marcado de notificaciones propias
+const RUTAS_PERMITIDAS = ["/notificaciones", "/trimestres/porLineas", "/pot/metas"]
 
 module.exports = async (req, res, next) => {
   try {
